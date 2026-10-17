@@ -1,7 +1,7 @@
 
 import { defineConfig, type Plugin } from 'vite';
 import fs from 'node:fs';
-import path from 'node:path';
+import path, { resolve } from 'node:path';
 
 const root = process.cwd();
 const srcDir = path.join(root, 'src');
@@ -25,15 +25,15 @@ function generatedPages(): Plugin {
   let generatedFiles: string[] = [];
   let entries: string[] = [];
 
-  
-  function generate(isBuild: boolean) {
+
+  function generate(build: boolean) {
     entries = getEntries();
     generatedFiles = [];
 
     for (const entry of entries) {
-      const file = path.join(root, isBuild ? `${entry}.html` : `.vite-generated/${entry}.html`);
-
-      fs.writeFileSync(file, makeHtml(entry));
+      const file = path.join(root, `${entry}.html`);
+      if (build)
+        fs.writeFileSync(file, makeHtml(entry));
       generatedFiles.push(file);
     }
   }
@@ -68,65 +68,32 @@ function generatedPages(): Plugin {
 
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (
-          !req.url ||
-          !['GET', 'HEAD'].includes(req.method ?? '')
-        ) {
+        if (!req.url || !['GET', 'HEAD'].includes(req.method ?? ''))
           return next();
+
+        let urlPath = req.url?.split('?')[0] || '/';
+
+        if (urlPath === '/')
+          urlPath = '/index.html';
+
+        if (req.method === "GET" && (urlPath.endsWith(".html")/* || !/\.[^\/]+$/.test(urlPath)*/)) {
+          urlPath = urlPath.slice(1).replace(/\.html$/, "");
+          if (entries.includes(urlPath)) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'text/html');
+            res.end(makeHtml(urlPath));
+            return;
+          }
+          else {
+            const staticHtmlPath = urlPath.endsWith('.html') ? urlPath : `${urlPath}.html`;
+            const hasStaticHtml = fs.existsSync(resolve(__dirname, `.${staticHtmlPath}`));
+
+            if (!hasStaticHtml && urlPath !== '/404.html')
+              req.url = '/404.html';
+          }
         }
-
-        let pathname: string;
-
-        try {
-          pathname = decodeURIComponent(
-            new URL(req.url, 'http://localhost').pathname
-          );
-        } catch {
-          res.statusCode = 400;
-          return res.end('Bad Request');
-        }
-
-        if (pathname === '/') {
-          pathname = '/index.html';
-        }
-        
-
-        const entry = pathname
-          .replace(/^\//, '')
-          .replace(/\.html$/, '');
-
-        if (pathname.endsWith(".html"))
-          req.url = req.url.replace(entry, ".vite-generated/" + entry)
-        else
-          req.url = req.url.replace(".vite-generated/", "")
-        
-        if (
-          !pathname.slice(1).includes('/') &&
-          entries.includes(entry)
-        ) {
-          return next();
-        }
-
-        if (
-          !pathname.slice(1).includes('/') &&
-          pathname.endsWith('.html')
-        ) {
-          res.statusCode = 404;
-          res.setHeader(
-            'Content-Type',
-            'text/html; charset=utf-8'
-          );
-
-          const html = fs.readFileSync(errorPagePath, 'utf8');
-          return res.end(
-            req.method === 'HEAD' ? undefined : html
-          );
-        }
-
         next();
       });
-
-      server.httpServer?.once('close', cleanup);
     },
 
     closeBundle() {
@@ -144,5 +111,6 @@ function generatedPages(): Plugin {
 
 export default defineConfig({
   base: './',
-  plugins: [generatedPages()]
+  plugins: [generatedPages()],
+  assetsInclude: "404.html"
 });
