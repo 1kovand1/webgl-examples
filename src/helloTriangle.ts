@@ -16,7 +16,6 @@ function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
 }
 resizeCanvas(gl, canvas);
 
-// 2. Описание шейдеров (GLSL ES 3.00)
 const vsSource = `#version 300 es
     in vec3 vertexPos;
     void main() {
@@ -32,7 +31,6 @@ const fsSource = `#version 300 es
     }
 `;
 
-// Функция компиляции шейдеров
 function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
     const loadShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
         const shader = gl.createShader(type);
@@ -58,7 +56,9 @@ const programInfo = {
 };
 
 const vertices = new Float32Array([
-     0.0,  0.5,  0.0,  -0.5, -0.5,  0.0,   0.5, -0.5,  0.0
+     0.0,  0.5,  0.0,  
+     -0.5, -0.5,  0.0,  
+     0.5, -0.5,  0.0
 ]);
 
 const vao = gl.createVertexArray();
@@ -73,4 +73,4 @@ gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false
 
 gl.clearColor(0.1, 0.1, 0.1, 1.0);
 gl.useProgram(programInfo.program);
-gl.drawArrays(gl.TRIANGLES, 0, 3); // Рисуем 4 грани пирамиды
+gl.drawArrays(gl.TRIANGLES, 0, 3);
