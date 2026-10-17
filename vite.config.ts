@@ -50,17 +50,18 @@ function generatedPages(): Plugin {
     name: 'generated-pages',
     config(config, configEnv) {
       generate(configEnv.command === 'build');
-
+      debugger;
       return {
         appType: 'mpa',
         build: {
           rollupOptions: {
-            input: Object.fromEntries(
-              entries.map(entry => [
+            input: Object.fromEntries([
+              ["404", path.join(root, "404.html")], 
+              ...entries.map(entry => [
                 entry,
                 path.join(root, `${entry}.html`)
               ])
-            )
+            ])
           }
         }
       };
@@ -97,13 +98,6 @@ function generatedPages(): Plugin {
     },
 
     closeBundle() {
-      const distDir = path.join(root, 'dist');
-
-      fs.copyFileSync(
-        errorPagePath,
-        path.join(distDir, '404.html')
-      );
-
       cleanup();
     }
   };
@@ -116,6 +110,5 @@ export default defineConfig({
     modulePreload: {
       polyfill: false
     }
-  },
-  assetsInclude: "404.html"
+  }
 });
