@@ -1,0 +1,73 @@
+@font-face {
+  font-family: "Minecraft";
+  src: url("./minecraft.woff2") format("woff2");
+  font-style: normal;
+  font-display: swap;
+}
+body {
+  height: 100vh;
+  flex-direction: column;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+}
+ol {
+  margin: 0;
+  width: 100%;
+  gap: 30px;
+  height: 80%;
+  width: 80%;
+  flex-direction: column;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  counter-reset: li;
+  list-style: none;
+  font-family: Minecraft;
+  padding: 0;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+ol a {
+  height: 100%;
+  width: 100%;
+  position: relative;
+  display: block;
+  background: #dad2ca;
+  color: #444;
+  text-decoration: none;
+  border-radius: 0.3em;
+  transition: 0.3s ease-out;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+ol a:hover {
+  background: #e9e4e0;
+}
+ol a:hover:before {
+  transform: rotate(360deg);
+}
+ol a:before {
+  content: counter(li);
+  counter-increment: li;
+  position: absolute;
+  left: -1.3em;
+  top: 50%;
+  margin-top: -1.3em;
+  background: #8fd4c1;
+  height: 2em;
+  width: 2em;
+  line-height: 2em;
+  border: 0.3em solid white;
+  text-align: center;
+  font-weight: 500;
+  border-radius: 2em;
+  transition: all 0.3s ease-out;
+}
+li {
+  flex-grow: 1;
+  width: 100%;
+  font-size: 60px;
+}

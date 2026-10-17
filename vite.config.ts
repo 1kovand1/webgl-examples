@@ -112,5 +112,10 @@ function generatedPages(): Plugin {
 export default defineConfig({
   base: './',
   plugins: [generatedPages()],
+  build: {
+    modulePreload: {
+      polyfill: false
+    }
+  },
   assetsInclude: "404.html"
 });
