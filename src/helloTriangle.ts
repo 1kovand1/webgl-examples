@@ -1,3 +1,5 @@
+export {};
+document.title = "Треугольник";
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement | null;
 if (canvas === null) 
   throw new Error("Could not find canvas element");

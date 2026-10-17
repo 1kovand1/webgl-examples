@@ -32,7 +32,7 @@ function generatedPages(): Plugin {
 
     for (const entry of entries) {
       const file = path.join(root, `${entry}.html`);
-      if (build)
+      if (build && !fs.existsSync(file))
         fs.writeFileSync(file, makeHtml(entry));
       generatedFiles.push(file);
     }
@@ -76,7 +76,7 @@ function generatedPages(): Plugin {
         if (urlPath === '/')
           urlPath = '/index.html';
 
-        if (req.method === "GET" && (urlPath.endsWith(".html")/* || !/\.[^\/]+$/.test(urlPath)*/)) {
+        if (req.method === "GET" && (urlPath.endsWith(".html")/* || !/\.[^\/]+$/.test(urlPath)*/) && !fs.existsSync(path.join(root, `urlPath`))) {
           urlPath = urlPath.slice(1).replace(/\.html$/, "");
           if (entries.includes(urlPath)) {
             res.statusCode = 200;
@@ -86,7 +86,7 @@ function generatedPages(): Plugin {
           }
           else {
             const staticHtmlPath = urlPath.endsWith('.html') ? urlPath : `${urlPath}.html`;
-            const hasStaticHtml = fs.existsSync(resolve(__dirname, `.${staticHtmlPath}`));
+            const hasStaticHtml = fs.existsSync(resolve(import.meta.dirname, `.${staticHtmlPath}`));
 
             if (!hasStaticHtml && urlPath !== '/404.html')
               req.url = '/404.html';
