@@ -14,7 +14,6 @@ function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.height = window.innerHeight;
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
 }
-window.addEventListener('resize', () => resizeCanvas(gl, canvas));
 resizeCanvas(gl, canvas);
 
 // 2. Описание шейдеров (GLSL ES 3.00)

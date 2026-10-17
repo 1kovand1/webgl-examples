@@ -89,12 +89,17 @@ function generatedPages(): Plugin {
         if (pathname === '/') {
           pathname = '/index.html';
         }
+        
 
         const entry = pathname
           .replace(/^\//, '')
           .replace(/\.html$/, '');
-        if (/\.html$/.test(req.url))
+
+        if (pathname.endsWith(".html"))
           req.url = req.url.replace(entry, ".vite-generated/" + entry)
+        else
+          req.url = req.url.replace(".vite-generated/", "")
+        
         if (
           !pathname.slice(1).includes('/') &&
           entries.includes(entry)
