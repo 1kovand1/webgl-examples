@@ -1,9 +1,8 @@
 export {};
 import {mat4} from 'gl-matrix';
 document.title = "Преобразования координат";
-const canvas = document.getElementById('glCanvas') as HTMLCanvasElement | null;
-if (canvas === null) 
-  throw new Error("Could not find canvas element");
+
+const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
 
 const gl = canvas.getContext('webgl2');
 
@@ -85,6 +84,7 @@ gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false
 
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(programInfo.program);
     const minDimension = Math.min(canvas.width, canvas.height);
     const cameraMatrix = mat4.create();

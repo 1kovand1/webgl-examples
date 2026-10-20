@@ -95,19 +95,24 @@ const vertices = new Float32Array([
     0.5, 0.5, 0, 1, 1,
     0.5, -0.5, 0, 1, 0,
     -0.5, 0.5, 0, 0, 1,
-
-    0.5, -0.5, 0, 1, 0,
-    -0.5, 0.5, 0, 0, 1,
     -0.5, -0.5, 0, 0, 0
+]);
+
+const indices = new Uint32Array([
+    0, 1, 2, 1, 2, 3
 ]);
 
 const vao = gl.createVertexArray();
 gl.bindVertexArray(vao);
 
 const vbo = gl.createBuffer();
-const texture = await loadTexture(gl, "./nether_core.png");
 gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
 gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+const ebo = gl.createBuffer();
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ebo);
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+const texture = await loadTexture(gl, "./nether_core.png");
 
 gl.enableVertexAttribArray(programInfo.attribLocations.vertexPos);
 gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 5 * 4, 0);
@@ -121,4 +126,4 @@ gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, texture);
 gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
-gl.drawArrays(gl.TRIANGLES, 0, 6);
+gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_INT, 0);
