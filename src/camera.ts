@@ -96,8 +96,8 @@ function loadTexture(gl: WebGL2RenderingContext, url: string): Promise<WebGLText
 
     });
 }
-const texture = await loadTexture(gl, "./nether_core.png");
-
+gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+const texture = await loadTexture(gl, "./windowsxp.png");
 const positions = new Float32Array([
     -1.0, -1.0,  1.0,   1.0, -1.0,  1.0,   1.0,  1.0,  1.0,  -1.0,  1.0,  1.0,
     -1.0, -1.0, -1.0,  -1.0,  1.0, -1.0,   1.0,  1.0, -1.0,   1.0, -1.0, -1.0,
@@ -107,12 +107,12 @@ const positions = new Float32Array([
     -1.0, -1.0, -1.0,  -1.0, -1.0,  1.0,  -1.0,  1.0,  1.0,  -1.0,  1.0, -1.0,
 ]);
 const textureCoords = new Float32Array([
-    0.0,  0.0,   1.0,  0.0,   1.0,  1.0,   0.0,  1.0,
-    1.0,  0.0,   1.0,  1.0,   0.0,  1.0,   0.0,  0.0,
-    0.0,  1.0,   0.0,  0.0,   1.0,  0.0,   1.0,  1.0,
-    1.0,  1.0,   0.0,  1.0,   0.0,  0.0,   1.0,  0.0,
-    1.0,  0.0,   1.0,  1.0,   0.0,  1.0,   0.0,  0.0,
-    0.0,  0.0,   1.0,  0.0,   1.0,  1.0,   0.0,  1.0,
+    0.0,  0.0,   0.5,  0.0,   0.5,  0.5,   0.0,  0.5,
+    0.5,  0.0,   0.5,  0.5,   1.0,  0.5,   1.0,  0.0,
+    0.0,  1.0,   0.0,  0.5,   0.5,  0.5,   0.5,  1.0,
+    0.5,  1.0,   0.0,  1.0,   0.0,  0.5,   0.5,  0.5,
+    1.0,  0.0,   1.0,  0.5,   0.5,  0.5,   0.5,  0.0,
+    0.5,  0.0,   0.0,  0.0,   0.0,  0.5,   0.5,  0.5,
 ]);
 
 const indices = new Uint16Array([
@@ -209,6 +209,7 @@ canvas.addEventListener('touchmove', (e) => {
 
 function processInput() {
     const SPEED = 0.05;
+    const ROLLSPEED = 0.01;
     const forward = vec3.fromValues(0,0,-1);
     vec3.transformQuat(forward, forward, cameraQuat);
     const right = vec3.fromValues(1,0,0);
@@ -236,6 +237,17 @@ function processInput() {
         vec3.scaleAndAdd(cameraCords, cameraCords, up, SPEED);
     if (pressedKeys.has("Shift"))
         vec3.scaleAndAdd(cameraCords, cameraCords, down, SPEED);
+    if (pressedKeys.has("q")) {
+        const deltaRotation = quat.create();
+        quat.setAxisAngle(deltaRotation, forward,  -ROLLSPEED);
+        quat.multiply(cameraQuat, deltaRotation, cameraQuat);
+    }
+    if (pressedKeys.has("e")) {
+        const deltaRotation = quat.create();
+        quat.setAxisAngle(deltaRotation, forward,  ROLLSPEED);
+        quat.multiply(cameraQuat, deltaRotation, cameraQuat);
+    }
+        
 
 }
 
