@@ -151,34 +151,38 @@ const cameraCords = vec3.fromValues(0,0, 1);
 const cameraQuat = quat.create();
 
 const pressedKeys = new Set();
-window.addEventListener("keydown", (event: KeyboardEvent) => {pressedKeys.add(event.key)});
-window.addEventListener("keyup", (event: KeyboardEvent) => {pressedKeys.delete(event.key)});
+window.addEventListener("keydown", (event: KeyboardEvent) => {pressedKeys.add(event.code)});
+window.addEventListener("keyup", (event: KeyboardEvent) => {pressedKeys.delete(event.code)});
 let isDragging = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+let lastTouchX = 0;
+let lastTouchY = 0;
+
 let cameraPointerId: number = 0;
 
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('mousedown', async() => {
+    await canvas.requestPointerLock();
     isDragging = true;
-    lastMouseX = e.clientX;
-    lastMouseY = e.clientY;
+    lastMouseX = 0;
+    lastMouseY = 0;
 });
 
-window.addEventListener('mouseup', () => {
-    isDragging = false;
+document.addEventListener('pointerlockchange', () => {
+    if (document.pointerLockElement === null)
+        isDragging = false;
 });
 
 window.addEventListener('mousemove', (e) => {
     const SENSITIVITY = 0.01;
     if (!isDragging) return;
-
     const right = vec3.fromValues(1,0,0);
     vec3.transformQuat(right, right, cameraQuat);
     const up = vec3.fromValues(0,1,0);
     vec3.transformQuat(up, up, cameraQuat);
 
-    const dx = e.clientX - lastMouseX;
-    const dy = e.clientY - lastMouseY;
+    const dx = e.movementX;
+    const dy = e.movementY;
 
     const deltaRotation = quat.create();
     quat.setAxisAngle(deltaRotation, up, -dx * SENSITIVITY);
@@ -186,8 +190,8 @@ window.addEventListener('mousemove', (e) => {
     quat.setAxisAngle(deltaRotation, right, -dy * SENSITIVITY);
     quat.multiply(cameraQuat, deltaRotation, cameraQuat);
 
-    lastMouseX = e.clientX;
-    lastMouseY = e.clientY;
+    lastMouseX += e.movementX;
+    lastMouseY -= e.movementY;
 });
 
 // Сенсорное управление для мобильных устройств
@@ -195,21 +199,23 @@ canvas.addEventListener('touchstart', (e) => {
     if (!isDragging) {
         cameraPointerId = e.targetTouches[0].identifier; 
         isDragging = true;
-        lastMouseX = e.targetTouches[0].clientX;
-        lastMouseY = e.targetTouches[0].clientY;
+        lastTouchX = e.targetTouches[0].clientX;
+        lastTouchY = e.targetTouches[0].clientY;
     }
 });
-window.addEventListener('touchend', () => isDragging = false);
+canvas.addEventListener('touchend', () => isDragging = false);
 canvas.addEventListener('touchmove', (e) => {
     if (!isDragging || cameraPointerId !== e.targetTouches[0].identifier) return;
-    const mockEvent = { clientX: e.targetTouches[0].clientX, clientY: e.targetTouches[0].clientY };
+    const mockEvent = { movementX: e.targetTouches[0].clientX - lastTouchX, movementY: e.targetTouches[0].clientY - lastTouchY };
+    lastTouchX = e.targetTouches[0].clientX;
+    lastTouchY = e.targetTouches[0].clientY;
     window.dispatchEvent(new MouseEvent('mousemove', mockEvent));
 });
 
 
-function processInput() {
-    const SPEED = 0.05;
-    const ROLLSPEED = 0.01;
+function processInput(dt: number) {
+    const SPEED = 0.008;
+    const ROLLSPEED = 0.002;
     const forward = vec3.fromValues(0,0,-1);
     vec3.transformQuat(forward, forward, cameraQuat);
     const right = vec3.fromValues(1,0,0);
@@ -225,26 +231,26 @@ function processInput() {
     vec3.negate(down, up);
 
 
-    if (pressedKeys.has("w") || isPressed["btn-up"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, forward, SPEED);
-    if (pressedKeys.has("s") || isPressed["btn-down"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, backward, SPEED);
-    if (pressedKeys.has("a") || isPressed["btn-left"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, left, SPEED);
-    if (pressedKeys.has("d") || isPressed["btn-right"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, right, SPEED);
-    if (pressedKeys.has(" "))
-        vec3.scaleAndAdd(cameraCords, cameraCords, up, SPEED);
-    if (pressedKeys.has("Shift"))
-        vec3.scaleAndAdd(cameraCords, cameraCords, down, SPEED);
-    if (pressedKeys.has("q")) {
+    if (pressedKeys.has("KeyW") || isPressed["btn-up"])
+        vec3.scaleAndAdd(cameraCords, cameraCords, forward, SPEED*dt);
+    if (pressedKeys.has("KeyS") || isPressed["btn-down"])
+        vec3.scaleAndAdd(cameraCords, cameraCords, backward, SPEED*dt);
+    if (pressedKeys.has("KeyA") || isPressed["btn-left"])
+        vec3.scaleAndAdd(cameraCords, cameraCords, left, SPEED*dt);
+    if (pressedKeys.has("KeyD") || isPressed["btn-right"])
+        vec3.scaleAndAdd(cameraCords, cameraCords, right, SPEED*dt);
+    if (pressedKeys.has("Space"))
+        vec3.scaleAndAdd(cameraCords, cameraCords, up, SPEED*dt);
+    if (pressedKeys.has("ShiftLeft"))
+        vec3.scaleAndAdd(cameraCords, cameraCords, down, SPEED*dt);
+    if (pressedKeys.has("KeyQ")) {
         const deltaRotation = quat.create();
-        quat.setAxisAngle(deltaRotation, forward,  -ROLLSPEED);
+        quat.setAxisAngle(deltaRotation, forward,  -ROLLSPEED*dt);
         quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     }
-    if (pressedKeys.has("e")) {
+    if (pressedKeys.has("KeyE")) {
         const deltaRotation = quat.create();
-        quat.setAxisAngle(deltaRotation, forward,  ROLLSPEED);
+        quat.setAxisAngle(deltaRotation, forward,  ROLLSPEED*dt);
         quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     }
         
@@ -254,8 +260,13 @@ function processInput() {
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, texture);
 
-function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
-    processInput();
+let time: DOMHighResTimeStamp;
+function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp: DOMHighResTimeStamp) {
+    if (time === undefined)
+        time = timestamp;
+    const dt = timestamp - time;
+    time = timestamp;
+    processInput(dt);
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(programInfo.program);
@@ -292,7 +303,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 
 
-    requestAnimationFrame(() => render(gl, canvas));
+    requestAnimationFrame((timestamp) => render(gl, canvas, timestamp));
 }
 
-requestAnimationFrame(() => render(gl, canvas));
+requestAnimationFrame((timestamp) => render(gl, canvas, timestamp));
