@@ -161,12 +161,13 @@ let lastTouchY = 0;
 
 let cameraPointerId: number = 0;
 
-canvas.addEventListener('mousedown', async() => {
-    await canvas.requestPointerLock();
-    isDragging = true;
-    lastMouseX = 0;
-    lastMouseY = 0;
-});
+if (!window.matchMedia("(pointer: coarse)").matches)
+    canvas.addEventListener('mousedown', async() => {
+        await canvas.requestPointerLock();
+        isDragging = true;
+        lastMouseX = 0;
+        lastMouseY = 0;
+    });
 
 document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement === null)
