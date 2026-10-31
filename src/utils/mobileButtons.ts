@@ -1,4 +1,4 @@
-import "./assets/buttons.css"
+import "../assets/buttons.css"
 
 document.body.insertAdjacentHTML("beforeend", `
   <div id="touch-overlay" class="touch-overlay hidden">

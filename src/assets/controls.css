@@ -1,0 +1,27 @@
+input[type="range"] {
+  height: 15px;
+  flex-grow: 1;
+}
+
+label {
+  color: white;
+  display: flex;
+  justify-content: center;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  margin: auto;
+  width: 50vw;
+}
+
+button {
+  width: fit-content;
+  height: 2rem;
+  align-self: center;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  outline: none !important;
+}

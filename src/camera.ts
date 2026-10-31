@@ -1,6 +1,7 @@
 export {};
-import {mat4, vec3, quat} from 'gl-matrix';
-import {isPressed} from "./mobileButtons"
+import {mat4} from 'gl-matrix';
+import {getWorldToCameraMatrix, processInput} from "./utils/camera"
+import "./assets/controls.css"
 document.title = "Камера";
 
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
@@ -10,6 +11,25 @@ const gl = canvas.getContext('webgl2');
 if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
 }
+
+canvas.insertAdjacentHTML("beforebegin", `
+    <div class="controls">
+        <button id="depthButton" style="background: mediumseagreen;">Выключить тест глубины</button>
+    </div>
+`);
+const depthButton = document.getElementById("depthButton") as HTMLButtonElement;
+depthButton?.addEventListener("click", () => {
+    if (gl.isEnabled(gl.DEPTH_TEST)) {
+        gl.disable(gl.DEPTH_TEST);
+        depthButton.innerText = "Включить тест глубины";
+        depthButton.style.background = "lightcoral";
+    }
+    else {
+        gl.enable(gl.DEPTH_TEST);
+        depthButton.innerText = "Выключить тест глубины";
+        depthButton.style.background = "mediumseagreen";
+    }
+})
 
 // Подгоняем размер холста под экран
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
@@ -147,117 +167,6 @@ gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
 
 gl.enable(gl.DEPTH_TEST);
 
-const cameraCords = vec3.fromValues(0,0, 1);
-const cameraQuat = quat.create();
-
-const pressedKeys = new Set();
-window.addEventListener("keydown", (event: KeyboardEvent) => {pressedKeys.add(event.code)});
-window.addEventListener("keyup", (event: KeyboardEvent) => {pressedKeys.delete(event.code)});
-let isDragging = false;
-let lastMouseX = 0;
-let lastMouseY = 0;
-let lastTouchX = 0;
-let lastTouchY = 0;
-
-let cameraPointerId: number = 0;
-
-if (!window.matchMedia("(pointer: coarse)").matches)
-    canvas.addEventListener('mousedown', async() => {
-        await canvas.requestPointerLock();
-        isDragging = true;
-        lastMouseX = 0;
-        lastMouseY = 0;
-    });
-
-document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement === null)
-        isDragging = false;
-});
-
-window.addEventListener('mousemove', (e) => {
-    const SENSITIVITY = 0.01;
-    if (!isDragging) return;
-    const right = vec3.fromValues(1,0,0);
-    vec3.transformQuat(right, right, cameraQuat);
-    const up = vec3.fromValues(0,1,0);
-    vec3.transformQuat(up, up, cameraQuat);
-
-    const dx = e.movementX;
-    const dy = e.movementY;
-
-    const deltaRotation = quat.create();
-    quat.setAxisAngle(deltaRotation, up, -dx * SENSITIVITY);
-    quat.multiply(cameraQuat, deltaRotation, cameraQuat);
-    quat.setAxisAngle(deltaRotation, right, -dy * SENSITIVITY);
-    quat.multiply(cameraQuat, deltaRotation, cameraQuat);
-
-    lastMouseX += e.movementX;
-    lastMouseY -= e.movementY;
-});
-
-// Сенсорное управление для мобильных устройств
-canvas.addEventListener('touchstart', (e) => {
-    if (!isDragging) {
-        cameraPointerId = e.targetTouches[0].identifier; 
-        isDragging = true;
-        lastTouchX = e.targetTouches[0].clientX;
-        lastTouchY = e.targetTouches[0].clientY;
-    }
-});
-canvas.addEventListener('touchend', () => isDragging = false);
-canvas.addEventListener('touchmove', (e) => {
-    if (!isDragging || cameraPointerId !== e.targetTouches[0].identifier) return;
-    const mockEvent = { movementX: e.targetTouches[0].clientX - lastTouchX, movementY: e.targetTouches[0].clientY - lastTouchY };
-    lastTouchX = e.targetTouches[0].clientX;
-    lastTouchY = e.targetTouches[0].clientY;
-    window.dispatchEvent(new MouseEvent('mousemove', mockEvent));
-});
-
-
-function processInput(dt: number) {
-    const SPEED = 0.008;
-    const ROLLSPEED = 0.002;
-    const forward = vec3.fromValues(0,0,-1);
-    vec3.transformQuat(forward, forward, cameraQuat);
-    const right = vec3.fromValues(1,0,0);
-    vec3.transformQuat(right, right, cameraQuat);
-    const up = vec3.fromValues(0,1,0);
-    vec3.transformQuat(up, up, cameraQuat);
-
-    const backward = vec3.create();
-    vec3.negate(backward, forward);
-    const left = vec3.create();
-    vec3.negate(left, right);
-    const down = vec3.create();
-    vec3.negate(down, up);
-
-
-    if (pressedKeys.has("KeyW") || isPressed["btn-up"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, forward, SPEED*dt);
-    if (pressedKeys.has("KeyS") || isPressed["btn-down"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, backward, SPEED*dt);
-    if (pressedKeys.has("KeyA") || isPressed["btn-left"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, left, SPEED*dt);
-    if (pressedKeys.has("KeyD") || isPressed["btn-right"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, right, SPEED*dt);
-    if (pressedKeys.has("Space"))
-        vec3.scaleAndAdd(cameraCords, cameraCords, up, SPEED*dt);
-    if (pressedKeys.has("ShiftLeft"))
-        vec3.scaleAndAdd(cameraCords, cameraCords, down, SPEED*dt);
-    if (pressedKeys.has("KeyQ")) {
-        const deltaRotation = quat.create();
-        quat.setAxisAngle(deltaRotation, forward,  -ROLLSPEED*dt);
-        quat.multiply(cameraQuat, deltaRotation, cameraQuat);
-    }
-    if (pressedKeys.has("KeyE")) {
-        const deltaRotation = quat.create();
-        quat.setAxisAngle(deltaRotation, forward,  ROLLSPEED*dt);
-        quat.multiply(cameraQuat, deltaRotation, cameraQuat);
-    }
-        
-
-}
-
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, texture);
 
@@ -271,15 +180,8 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(programInfo.program);
-    const cameraMatrix = mat4.create();
-    const nCameraCoords = vec3.create();
-    const cameraRotationMatrix = mat4.create();
-    const cameraRotationConj = quat.create();
-    vec3.negate(nCameraCoords, cameraCords);
-    quat.conjugate(cameraRotationConj, cameraQuat);
-    mat4.fromQuat(cameraRotationMatrix, cameraRotationConj);
-    mat4.translate(cameraMatrix, cameraMatrix, nCameraCoords);
-    mat4.multiply(cameraMatrix, cameraRotationMatrix, cameraMatrix);
+    
+    const cameraMatrix = getWorldToCameraMatrix();
 
     const projectionMatrix = mat4.create();
     mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);

@@ -50,7 +50,6 @@ function generatedPages(): Plugin {
     name: 'generated-pages',
     config(config, configEnv) {
       generate(configEnv.command === 'build');
-      debugger;
       return {
         appType: 'mpa',
         build: {

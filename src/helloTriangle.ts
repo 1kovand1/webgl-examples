@@ -10,6 +10,22 @@ if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
 }
 
+canvas.insertAdjacentHTML("beforebegin", `
+    <div id="sliders" class="controls">
+        <label> <input id="rangeR" type="range" min="0" max="255">R</label>
+        <label> <input id="rangeG" type="range" min="0" max="255">G</label>
+        <label> <input id="rangeB" type="range" min="0" max="255">B</label>
+    </div>
+`);
+
+const rangeR = document.getElementById("rangeR") as HTMLInputElement;
+const rangeG = document.getElementById("rangeG") as HTMLInputElement;
+const rangeB = document.getElementById("rangeB") as HTMLInputElement;
+
+rangeR.addEventListener("input", () =>draw(gl));
+rangeG.addEventListener("input", () =>draw(gl));
+rangeB.addEventListener("input", () =>draw(gl));
+
 // Подгоняем размер холста под экран
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
@@ -27,9 +43,10 @@ const vsSource = `#version 300 es
 
 const fsSource = `#version 300 es
     precision highp float;
+    uniform vec3 color;
     out vec4 fragColor;
     void main() {
-        fragColor = vec4(1.0, 0.5, 0.2, 1.0); 
+        fragColor = vec4(color, 1.0); 
     }
 `;
 
@@ -48,6 +65,8 @@ function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSourc
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
+    gl.deleteShader(vs);
+    gl.deleteShader(fs);
     return program;
 }
 
@@ -55,6 +74,7 @@ const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
 const programInfo = {
     program: shaderProgram,
     attribLocations: { vertexPos: gl.getAttribLocation(shaderProgram, 'vertexPos') },
+    uniformLocations: {color: gl.getUniformLocation(shaderProgram, "color")}
 };
 
 const vertices = new Float32Array([
@@ -73,6 +93,12 @@ gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 gl.enableVertexAttribArray(programInfo.attribLocations.vertexPos);
 gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 0, 0);
 
-gl.clearColor(0.1, 0.1, 0.1, 1.0);
-gl.useProgram(programInfo.program);
-gl.drawArrays(gl.TRIANGLES, 0, 3);
+function draw(gl: WebGL2RenderingContext) {
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.useProgram(programInfo.program);
+    gl.uniform3f(programInfo.uniformLocations.color, +rangeR.value / 255.,+rangeG.value / 255., +rangeB.value / 255.);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+
+draw(gl);
