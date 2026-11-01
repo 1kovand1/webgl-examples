@@ -1,3 +1,5 @@
+import initShaderProgram from "./utils/shaderProgram";
+
 export {};
 document.title = "Два треугольника";
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement | null;
@@ -10,7 +12,6 @@ if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
 }
 
-// Подгоняем размер холста под экран
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -32,24 +33,6 @@ const fsSource = `#version 300 es
         fragColor = vec4(1.0, 0.5, 0.2, 1.0); 
     }
 `;
-
-function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
-    const loadShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
-        const shader = gl.createShader(type);
-        if (shader === null)
-          throw new Error("Could not create shader");
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        return shader;
-    };
-    const vs = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fs = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    return program;
-}
 
 const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
 const programInfo = {

@@ -1,5 +1,6 @@
 export {};
-import {mat4} from 'gl-matrix';
+import {mat4, vec2, vec3} from 'gl-matrix';
+import initShaderProgram from './utils/shaderProgram';
 document.title = "Преобразования координат";
 
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
@@ -22,10 +23,10 @@ window.addEventListener('resize', () => resizeCanvas(gl, canvas));
 const vsSource = `#version 300 es
     in vec3 vertexPos;
     uniform mat4 model;
-    uniform mat4 camera;
+    uniform mat4 view;
     uniform mat4 projection;
     void main() {
-        gl_Position = projection * camera * model * vec4(vertexPos, 1.0);
+        gl_Position = projection * view * model * vec4(vertexPos, 1.0);
     }
 `;
 
@@ -37,23 +38,28 @@ const fsSource = `#version 300 es
     }
 `;
 
-function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
-    const loadShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
-        const shader = gl.createShader(type);
-        if (shader === null)
-          throw new Error("Could not create shader");
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        return shader;
-    };
-    const vs = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fs = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    return program;
-}
+let phi = 0;
+let isDragging = false;
+let lastPos: vec2;
+
+canvas.addEventListener("pointerdown", (e) => {
+    isDragging = true;
+    lastPos = vec2.fromValues(e.x, e.y);
+});
+
+canvas.addEventListener("pointerup", () => {
+    isDragging = false;
+});
+
+canvas.addEventListener("pointermove", (e) => {
+    if (!isDragging)
+        return;
+    const newPos = vec2.fromValues(e.x, e.y);
+    const delta = vec2.sub(vec2.create(), newPos, lastPos);
+    const dPhi = -vec2.cross(vec3.create(), vec2.sub(lastPos, lastPos, vec2.fromValues(canvas.width / 2, canvas.height / 2)), delta)[2] / Math.max(canvas.width, canvas.height) / 360 * 2 * Math.PI;
+    lastPos = newPos;
+    phi += dPhi;
+});
 
 const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
 const programInfo = {
@@ -61,7 +67,7 @@ const programInfo = {
     attribLocations: { vertexPos: gl.getAttribLocation(shaderProgram, 'vertexPos') },
     uniformLocations: {
         model: gl.getUniformLocation(shaderProgram, "model"),
-        camera: gl.getUniformLocation(shaderProgram, "camera"),  
+        view: gl.getUniformLocation(shaderProgram, "view"),  
         projection: gl.getUniformLocation(shaderProgram, "projection"),  
     },
 };
@@ -87,7 +93,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(programInfo.program);
     const minDimension = Math.min(canvas.width, canvas.height);
-    const cameraMatrix = mat4.create();
+    const viewMatrix = mat4.fromZRotation(mat4.create(), phi);
     const projectionMatrix = mat4.create();
     mat4.scale(projectionMatrix, projectionMatrix, [minDimension / canvas.width, minDimension / canvas.height, 0]);
 
@@ -95,7 +101,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     mat4.translate(modelMatrix, modelMatrix, [-0.5,0,0]);
     mat4.rotateZ(modelMatrix, modelMatrix, Math.PI / 2);
     gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, modelMatrix);
-    gl.uniformMatrix4fv(programInfo.uniformLocations.camera, false, cameraMatrix);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.view, false, viewMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projectionMatrix);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 

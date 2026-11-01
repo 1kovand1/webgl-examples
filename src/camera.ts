@@ -2,6 +2,7 @@ export {};
 import {mat4} from 'gl-matrix';
 import {getWorldToCameraMatrix, processInput} from "./utils/camera"
 import "./assets/controls.css"
+import initShaderProgram from './utils/shaderProgram';
 document.title = "Камера";
 
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
@@ -64,23 +65,6 @@ const fsSource = `#version 300 es
     }
 `;
 
-function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
-    const loadShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
-        const shader = gl.createShader(type);
-        if (shader === null)
-          throw new Error("Could not create shader");
-        gl.shaderSource(shader, source);
-        gl.compileShader(shader);
-        return shader;
-    };
-    const vs = loadShader(gl, gl.VERTEX_SHADER, vsSource);
-    const fs = loadShader(gl, gl.FRAGMENT_SHADER, fsSource);
-    const program = gl.createProgram();
-    gl.attachShader(program, vs);
-    gl.attachShader(program, fs);
-    gl.linkProgram(program);
-    return program;
-}
 
 const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
 const programInfo = {
