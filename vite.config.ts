@@ -14,10 +14,10 @@ function getEntries(): string[] {
     .map(name => name.slice(0, -3));
 }
 
-function makeHtml(entry: string): string {
+function makeHtml(entry: string, dev: boolean = false): string {
   return fs.readFileSync(templatePath, 'utf8').replace(
     '<!-- ENTRY -->',
-    `<script type="module" src="./src/${entry}.ts"></script>`
+    dev ? `<script type="module" src="./src/${entry}.ts"></script><script type="module" src="/@vite/client"></script>` : `<script type="module" src="./src/${entry}.ts"></script>`
   );
 }
 
@@ -81,7 +81,7 @@ function generatedPages(): Plugin {
           if (entries.includes(urlPath)) {
             res.statusCode = 200;
             res.setHeader('Content-Type', 'text/html');
-            res.end(makeHtml(urlPath));
+            res.end(makeHtml(urlPath, true));
             return;
           }
           else {

@@ -1,5 +1,5 @@
 export {};
-import {mat4, vec2, vec3} from 'gl-matrix';
+import {mat4, vec2} from 'gl-matrix';
 import initShaderProgram from './utils/shaderProgram';
 document.title = "Преобразования координат";
 
@@ -40,24 +40,28 @@ const fsSource = `#version 300 es
 
 let phi = 0;
 let isDragging = false;
-let lastPos: vec2;
+const lastPos = vec2.create();
 
 canvas.addEventListener("pointerdown", (e) => {
     isDragging = true;
-    lastPos = vec2.fromValues(e.x, e.y);
+    vec2.set(lastPos, e.x, e.y);
 });
 
 canvas.addEventListener("pointerup", () => {
     isDragging = false;
 });
 
+const newPos= vec2.create();
+const delta = vec2.create();
+const R = vec2.create();
 canvas.addEventListener("pointermove", (e) => {
     if (!isDragging)
         return;
-    const newPos = vec2.fromValues(e.x, e.y);
-    const delta = vec2.sub(vec2.create(), newPos, lastPos);
-    const dPhi = -vec2.cross(vec3.create(), vec2.sub(lastPos, lastPos, vec2.fromValues(canvas.width / 2, canvas.height / 2)), delta)[2] / Math.max(canvas.width, canvas.height) / 360 * 2 * Math.PI;
-    lastPos = newPos;
+    vec2.set(newPos, e.x, e.y);
+    vec2.sub(delta, newPos, lastPos);
+    vec2.set(R, lastPos[0] - canvas.width / 2, lastPos[1] - canvas.height / 2);
+    const dPhi = (-R[0]*delta[1] + R[1]*delta[0]) / vec2.squaredLength(R);
+    vec2.copy(lastPos, newPos);
     phi += dPhi;
 });
 
@@ -88,29 +92,30 @@ gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 gl.enableVertexAttribArray(programInfo.attribLocations.vertexPos);
 gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 0, 0);
 
+const viewMatrix = mat4.create();
+const projectionMatrix = mat4.create();
+const modelMatrix = mat4.create();
+
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(programInfo.program);
     const minDimension = Math.min(canvas.width, canvas.height);
-    const viewMatrix = mat4.fromZRotation(mat4.create(), phi);
-    const projectionMatrix = mat4.create();
-    mat4.scale(projectionMatrix, projectionMatrix, [minDimension / canvas.width, minDimension / canvas.height, 0]);
+    mat4.fromZRotation(viewMatrix, phi);
+    
+    mat4.fromScaling(projectionMatrix,  [minDimension / canvas.width, minDimension / canvas.height, 0]);
 
-    let modelMatrix = mat4.create();
-    mat4.translate(modelMatrix, modelMatrix, [-0.5,0,0]);
+    mat4.fromTranslation(modelMatrix, [-0.5,0,0]);
     mat4.rotateZ(modelMatrix, modelMatrix, Math.PI / 2);
     gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, modelMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.view, false, viewMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projectionMatrix);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
-    modelMatrix = mat4.create();
-    mat4.translate(modelMatrix, modelMatrix, [0.5,0,0]);
+    mat4.fromTranslation(modelMatrix, [0.5,0,0]);
     mat4.rotateZ(modelMatrix, modelMatrix, -Math.PI / 2);
     gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, modelMatrix);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
-
 
     requestAnimationFrame(() => render(gl, canvas));
 }

@@ -4,20 +4,28 @@ document.body.insertAdjacentHTML("beforeend", `
   <div id="touch-overlay" class="touch-overlay hidden">
     <div class="drag-handle">☰</div>
     <div class="buttons-grid">
-      <button class="ctrl-btn" id="btn-up">▲</button>
+      <button class="ctrl-btn" id="btn-forward">▲</button>
       <button class="ctrl-btn" id="btn-left">◀</button>
       <button class="ctrl-btn" id="btn-right">▶</button>
-      <button class="ctrl-btn" id="btn-down">▼</button>
+      <button class="ctrl-btn" id="btn-backward">▼</button>
+      <button class="ctrl-btn" id="btn-cw">↷</button>
+      <button class="ctrl-btn" id="btn-ccw">↶</button>
+      <button class="ctrl-btn" id="btn-up">↑</button>
+      <button class="ctrl-btn" id="btn-down">↓</button>
     </div>
   </div>
 </div>
 `);
 
 export const isPressed = {
-    "btn-up": false,
-    "btn-down": false,
+    "btn-forward": false,
+    "btn-backward": false,
     "btn-left": false,
     "btn-right": false,
+    "btn-cw": false,
+    "btn-ccw": false,
+    "btn-up": false,
+    "btn-down": false,
 };
 
 const overlay = document.getElementById("touch-overlay") as HTMLDivElement;

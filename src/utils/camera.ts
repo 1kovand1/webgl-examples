@@ -30,18 +30,25 @@ document.addEventListener('pointerlockchange', () => {
         isDragging = false;
 });
 
+const right = vec3.create();
+const left = vec3.create();
+const up = vec3.create();
+const down = vec3.create();
+const forward = vec3.create();
+const backward = vec3.create();
+const deltaRotation = quat.create();
+
 window.addEventListener('mousemove', (e) => {
     const SENSITIVITY = 0.004;
     if (!isDragging) return;
-    const right = vec3.fromValues(1, 0, 0);
+    vec3.set(right, 1, 0, 0);
     vec3.transformQuat(right, right, cameraQuat);
-    const up = vec3.fromValues(0, 1, 0);
+    vec3.set(up, 0, 1, 0);
     vec3.transformQuat(up, up, cameraQuat);
 
     const dx = e.movementX;
     const dy = e.movementY;
 
-    const deltaRotation = quat.create();
     quat.setAxisAngle(deltaRotation, up, -dx * SENSITIVITY);
     quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     quat.setAxisAngle(deltaRotation, right, -dy * SENSITIVITY);
@@ -73,68 +80,65 @@ canvas.addEventListener('touchmove', (e) => {
 export function processInput(dt: number) {
     const SPEED = 0.008;
     const ROLLSPEED = 0.002;
-    const forward = vec3.fromValues(0, 0, -1);
+    vec3.set(forward, 0, 0, -1);
     vec3.transformQuat(forward, forward, cameraQuat);
-    const right = vec3.fromValues(1, 0, 0);
+    vec3.set(right, 1, 0, 0);
     vec3.transformQuat(right, right, cameraQuat);
-    const up = vec3.fromValues(0, 1, 0);
+    vec3.set(up, 0, 1, 0);
     vec3.transformQuat(up, up, cameraQuat);
-
-    const backward = vec3.create();
     vec3.negate(backward, forward);
-    const left = vec3.create();
     vec3.negate(left, right);
-    const down = vec3.create();
     vec3.negate(down, up);
 
 
-    if (pressedKeys.has("KeyW") || isPressed["btn-up"])
+    if (pressedKeys.has("KeyW") || isPressed["btn-forward"])
         vec3.scaleAndAdd(cameraCords, cameraCords, forward, SPEED * dt);
-    if (pressedKeys.has("KeyS") || isPressed["btn-down"])
+    if (pressedKeys.has("KeyS") || isPressed["btn-backward"])
         vec3.scaleAndAdd(cameraCords, cameraCords, backward, SPEED * dt);
     if (pressedKeys.has("KeyA") || isPressed["btn-left"])
         vec3.scaleAndAdd(cameraCords, cameraCords, left, SPEED * dt);
     if (pressedKeys.has("KeyD") || isPressed["btn-right"])
         vec3.scaleAndAdd(cameraCords, cameraCords, right, SPEED * dt);
-    if (pressedKeys.has("Space"))
+    if (pressedKeys.has("Space") || isPressed["btn-up"])
         vec3.scaleAndAdd(cameraCords, cameraCords, up, SPEED * dt);
-    if (pressedKeys.has("ShiftLeft"))
+    if (pressedKeys.has("ShiftLeft") || isPressed["btn-down"])
         vec3.scaleAndAdd(cameraCords, cameraCords, down, SPEED * dt);
-    if (pressedKeys.has("KeyQ")) {
-        const deltaRotation = quat.create();
+    if (pressedKeys.has("KeyQ") || isPressed["btn-ccw"]) {
         quat.setAxisAngle(deltaRotation, forward, -ROLLSPEED * dt);
         quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     }
-    if (pressedKeys.has("KeyE")) {
-        const deltaRotation = quat.create();
+    if (pressedKeys.has("KeyE") || isPressed["btn-cw"]) {
         quat.setAxisAngle(deltaRotation, forward, ROLLSPEED * dt);
         quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     }
 }
 
+const cameraMatrix = mat4.create();
+const nCameraCoords = vec3.create();
+const cameraRotationMatrix = mat4.create();
+const cameraRotationConj = quat.create();
+
 export function getWorldToCameraMatrix() {
-    const cameraMatrix = mat4.create();
-    const nCameraCoords = vec3.create();
-    const cameraRotationMatrix = mat4.create();
-    const cameraRotationConj = quat.create();
     vec3.negate(nCameraCoords, cameraCords);
     quat.conjugate(cameraRotationConj, cameraQuat);
     mat4.fromQuat(cameraRotationMatrix, cameraRotationConj);
-    mat4.translate(cameraMatrix, cameraMatrix, nCameraCoords);
+    mat4.fromTranslation(cameraMatrix, nCameraCoords);
     mat4.multiply(cameraMatrix, cameraRotationMatrix, cameraMatrix);
 
     return cameraMatrix;
 }
 
+const temp = vec3.create();
+const m = mat3.create();
 export function reflect(pos: vec3, norm: vec3) {
-    const forward = vec3.transformQuat(
-        vec3.create(),
+    vec3.transformQuat(
+        forward,
         vec3.fromValues(0, 0, -1),
         cameraQuat,
     );
 
-    const up = vec3.transformQuat(
-        vec3.create(),
+    vec3.transformQuat(
+        up,
         vec3.fromValues(0, 1, 0),
         cameraQuat,
     );
@@ -142,26 +146,24 @@ export function reflect(pos: vec3, norm: vec3) {
     vec3.scaleAndAdd(forward, forward, norm, -2 * vec3.dot(norm, forward));
     vec3.scaleAndAdd(up, up, norm, -2 * vec3.dot(norm, up));
 
-    const right = vec3.normalize(
-        vec3.create(),
+    vec3.normalize(
+        right,
         vec3.cross(vec3.create(), forward, up),
     );
 
     vec3.cross(up, right, forward);
     vec3.normalize(up, up);
 
-    const m = mat3.fromValues(
+    mat3.set(m,
         right[0], right[1], right[2],
         up[0], up[1], up[2],
         -forward[0], -forward[1], -forward[2],
     );
 
-    const result = quat.fromMat3(quat.create(), m);
-    quat.normalize(cameraQuat, result);
+    quat.fromMat3(cameraQuat, m);
+    quat.normalize(cameraQuat, cameraQuat);
 
-    const temp = vec3.create();
     vec3.sub(temp, cameraCords, pos);
     const proj = vec3.dot(temp, norm);
     vec3.scaleAndAdd(cameraCords, cameraCords, norm, -2*proj);
-    // console.log(forward);
 }

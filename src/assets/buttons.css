@@ -48,9 +48,9 @@ canvas {
 .buttons-grid {
   display: grid;
   grid-template-areas:
-    ". up ."
+    "ccw forward cw"
     "left . right"
-    ". down .";
+    "up backward down";
   gap: 10px;
   width: 100%;
 }
@@ -71,14 +71,26 @@ canvas {
   -webkit-touch-callout: none; 
 }
 
-#btn-up {
-  grid-area: up;
+#btn-forward {
+  grid-area: forward;
 }
 #btn-left {
   grid-area: left;
 }
 #btn-right {
   grid-area: right;
+}
+#btn-backward {
+  grid-area: backward;
+}
+#btn-cw {
+  grid-area: cw;
+}
+#btn-ccw {
+  grid-area: ccw;
+}
+#btn-up {
+  grid-area: up;
 }
 #btn-down {
   grid-area: down;

@@ -213,25 +213,23 @@ export default class Sphere {
     R: number;
     model: mat4 = mat4.create();
     modelNormal: mat4 = mat4.create();
-    _pos: vec3;
+    _pos: vec3 = vec3.create();
     constructor(gl: WebGL2RenderingContext, radius: number = 1, pos: vec3 = vec3.create()) {
         if (typeof VAO === "undefined")
             initStatic(gl);
 
         this.R = radius;
         this.pos = pos;
-        this._pos = pos;
     }
     get pos() {
         return this._pos;
     }
     set pos(value) {
-        this._pos = vec3.create();
-        mat4.translate(this.model, this.model, value);
+        vec3.copy(this._pos, value);
+        mat4.fromTranslation(this.model, value);
         mat4.scale(this.model, this.model, vec3.fromValues(this.R, this.R, this.R))
         mat4.transpose(this.modelNormal, this.model);
         mat4.invert(this.modelNormal, this.modelNormal);
-        this._pos = value;
     }
     draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4): void;
     draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;

@@ -47,6 +47,8 @@ const light = new Sphere(gl, 1, lightPos);
 const sphere = new Sphere(gl);
 const sphere2 = new Sphere(gl, 1, vec3.fromValues(0,-1,2));
 
+const projectionMatrix = mat4.create();
+
 let time: DOMHighResTimeStamp;
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp: DOMHighResTimeStamp) {
     if (time === undefined)
@@ -57,9 +59,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-
-
-    const projectionMatrix = mat4.create();
+    
     mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);
 
     light.draw(gl, getWorldToCameraMatrix(), projectionMatrix);

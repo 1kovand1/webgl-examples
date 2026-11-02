@@ -47,10 +47,10 @@ const vsSource = `#version 300 es
     out vec3 fragColor;
     out vec2 texturePos;
     uniform mat4 model;
-    uniform mat4 camera;
+    uniform mat4 view;
     uniform mat4 projection;
     void main() {
-        gl_Position = projection * camera * model * vec4(vertexPos, 1.0);
+        gl_Position = projection * view * model * vec4(vertexPos, 1.0);
         texturePos = atexturePos;
     }
 `;
@@ -72,7 +72,7 @@ const programInfo = {
     attribLocations: { vertexPos: gl.getAttribLocation(shaderProgram, 'vertexPos'), atexturePos: gl.getAttribLocation(shaderProgram, 'atexturePos')},
     uniformLocations: {
         model: gl.getUniformLocation(shaderProgram, "model"),
-        camera: gl.getUniformLocation(shaderProgram, "camera"),  
+        view: gl.getUniformLocation(shaderProgram, "view"),  
         projection: gl.getUniformLocation(shaderProgram, "projection"),  
         uSampler: gl.getUniformLocation(shaderProgram, "uSampler"),  
     },
@@ -154,6 +154,9 @@ gl.enable(gl.DEPTH_TEST);
 gl.activeTexture(gl.TEXTURE0);
 gl.bindTexture(gl.TEXTURE_2D, texture);
 
+const projectionMatrix = mat4.create();
+const modelMatrix = mat4.create();
+
 let time: DOMHighResTimeStamp;
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp: DOMHighResTimeStamp) {
     if (time === undefined)
@@ -165,16 +168,14 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(programInfo.program);
     
-    const cameraMatrix = getWorldToCameraMatrix();
+    const viewMatrix = getWorldToCameraMatrix();
 
-    const projectionMatrix = mat4.create();
     mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);
 
-    let modelMatrix = mat4.create();
-    mat4.translate(modelMatrix, modelMatrix, [-1, 0, 0]);
+    mat4.fromTranslation(modelMatrix, [-1, 0, 0]);
     mat4.scale(modelMatrix, modelMatrix, [0.5,0.5,0.5]);
     gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, modelMatrix);
-    gl.uniformMatrix4fv(programInfo.uniformLocations.camera, false, cameraMatrix);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.view, false, viewMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projectionMatrix);
 
     gl.activeTexture(gl.TEXTURE0);
@@ -183,8 +184,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
 
     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
 
-    modelMatrix = mat4.create();
-    mat4.translate(modelMatrix, modelMatrix, [1, 0, 0]);
+    mat4.fromTranslation(modelMatrix, [1, 0, 0]);
     mat4.scale(modelMatrix, modelMatrix, [0.5,0.5,0.5]);
     gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, modelMatrix);
     gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
