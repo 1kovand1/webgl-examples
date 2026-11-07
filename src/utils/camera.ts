@@ -77,6 +77,10 @@ canvas.addEventListener('touchmove', (e) => {
     canvas.dispatchEvent(new MouseEvent('mousemove', mockEvent));
 });
 
+canvas.addEventListener("click", async () => {
+    if (!document.fullscreenElement)
+        await document.body.requestFullscreen();
+});
 
 export function processInput(dt: number, speed: number = 0.008, rollspeed: number = 0.002) {
     vec3.set(forward, 0, 0, -1);
@@ -169,4 +173,11 @@ export function reflect(pos: vec3, norm: vec3) {
 
 export function setCameraPos(pos: vec3) {
     vec3.copy(cameraCords, pos);
+}
+
+export function moveBackward(delta: number) {
+    vec3.set(backward, 0, 0, 1);
+    vec3.transformQuat(backward, backward, cameraQuat);
+
+     vec3.scaleAndAdd(cameraCords, cameraCords, backward, delta);
 }

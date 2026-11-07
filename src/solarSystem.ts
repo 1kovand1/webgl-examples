@@ -1,17 +1,31 @@
 export { };
 import { mat4, vec3 } from "gl-matrix";
-import { cameraCords, getWorldToCameraMatrix, processInput, setCameraPos } from "./utils/camera"
+import { cameraCords, getWorldToCameraMatrix, moveBackward, processInput, setCameraPos } from "./utils/camera"
 import "./assets/controls.css"
 import { getPosition, initRK, RK4 } from "./utils/RK";
 import TexturedSphere from "./utils/texturedSphere";
 import { loadTexture } from "./utils/loadTexture";
 import { drawSkybox, initSkybox } from "./utils/skybox";
 import type celestialBody from "./interfaces/celestialBody";
+import "./assets/overlay.css";
+
 document.title = "Модель Солнечной системы";
 
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
+canvas.insertAdjacentHTML("beforebegin", `
+<div id="overlay">
+    <div class="row hidden">
+        <span>Скорость моделирования: x<p id="modellingSpeed">1</p></span>
+        <span>Позиция: <p id="position"></p></span>
+    </div>
+    <div id="textureWaitText"><p>Подождите, текстуры загружаются....</p></div>
+</div>
+    `);
 
 const gl = canvas.getContext('webgl2');
+const modellingSpeed = document.getElementById("modellingSpeed") as HTMLParagraphElement;
+const textureWaitText = document.getElementById("textureWaitText") as HTMLDivElement;
+const position = document.getElementById("position") as HTMLDivElement;
 
 if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
@@ -58,15 +72,23 @@ window.tp = function (name: string) {
 
 window.addEventListener("wheel", (e) => {
     if (e.deltaY < 0)
-        window.speed *= 2;
+        modellingSpeed.innerText = (window.speed *= 2).toString();
     else
-        window.speed /= 2;
+        modellingSpeed.innerText = (window.speed /= 2).toString();
 });
+
+window.addEventListener("keypress", (e) => {
+    if (!isNaN(+e.key) && +e.key < 9 && e.key !== " ") {
+        setCameraPos(getPosition(+e.key));
+        moveBackward(Object.values(modelData)[+e.key].radius * 20);
+    }
+})
 
 window.speed = 1;
 window.cameraSpeed = 0.00001;
 
-
+textureWaitText.remove();
+document.querySelectorAll("#overlay *").forEach(x => x.classList.remove("hidden"));
 
 let time: DOMHighResTimeStamp;
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp: DOMHighResTimeStamp) {
@@ -75,6 +97,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     const dt = timestamp - time;
     time = timestamp;
     processInput(dt, window.cameraSpeed);
+    position.innerText = `x: ${cameraCords[0].toFixed(2)}, y: ${cameraCords[1].toFixed(2)}, z: ${cameraCords[2].toFixed(2)}`
 
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -86,7 +109,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     spheres.forEach((d, i) => d.pos = getPosition(i));
     spheres[0].draw(gl, getWorldToCameraMatrix(), projectionMatrix);
     spheres.slice(1).forEach(sphere =>
-        sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, getPosition(0), cameraCords, 0.5, {
+        sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, getPosition(0), cameraCords, 0, {
             shininess: 1,
             ambient: vec3.fromValues(0,0,0),
             diffuse: vec3.fromValues(0.75, 0.75, 0.75),
