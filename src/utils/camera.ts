@@ -40,7 +40,7 @@ const deltaRotation = quat.create();
 
 canvas.addEventListener('mousemove', (e) => {
     const SENSITIVITY = 0.004;
-    if (document.pointerLockElement === null) return;
+    if (!isDragging) return;
 
     vec3.set(right, 1, 0, 0);
     vec3.transformQuat(right, right, cameraQuat);
@@ -74,7 +74,7 @@ canvas.addEventListener('touchmove', (e) => {
     const mockEvent = { movementX: e.targetTouches[0].clientX - lastTouchX, movementY: e.targetTouches[0].clientY - lastTouchY };
     lastTouchX = e.targetTouches[0].clientX;
     lastTouchY = e.targetTouches[0].clientY;
-    window.dispatchEvent(new MouseEvent('mousemove', mockEvent));
+    canvas.dispatchEvent(new MouseEvent('mousemove', mockEvent));
 });
 
 
