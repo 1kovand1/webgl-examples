@@ -66,9 +66,9 @@ ol a:before {
   border-radius: 2em;
   transition: all 0.3s ease-out;
 }
-ol a p {
+/* ol a p {
     padding: 2em;
-}
+} */
 li {
   flex-grow: 1;
   min-height: 0;

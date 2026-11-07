@@ -26,7 +26,7 @@ if (!window.matchMedia("(pointer: coarse)").matches)
     });
 
 document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement === null)
+    if (document.pointerLockElement === null) 
         isDragging = false;
 });
 
@@ -38,9 +38,10 @@ const forward = vec3.create();
 const backward = vec3.create();
 const deltaRotation = quat.create();
 
-window.addEventListener('mousemove', (e) => {
+canvas.addEventListener('mousemove', (e) => {
     const SENSITIVITY = 0.004;
-    if (!isDragging) return;
+    if (document.pointerLockElement === null) return;
+
     vec3.set(right, 1, 0, 0);
     vec3.transformQuat(right, right, cameraQuat);
     vec3.set(up, 0, 1, 0);
@@ -77,9 +78,7 @@ canvas.addEventListener('touchmove', (e) => {
 });
 
 
-export function processInput(dt: number) {
-    const SPEED = 0.008;
-    const ROLLSPEED = 0.002;
+export function processInput(dt: number, speed: number = 0.008, rollspeed: number = 0.002) {
     vec3.set(forward, 0, 0, -1);
     vec3.transformQuat(forward, forward, cameraQuat);
     vec3.set(right, 1, 0, 0);
@@ -92,23 +91,23 @@ export function processInput(dt: number) {
 
 
     if (pressedKeys.has("KeyW") || isPressed["btn-forward"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, forward, SPEED * dt);
+        vec3.scaleAndAdd(cameraCords, cameraCords, forward, speed * dt);
     if (pressedKeys.has("KeyS") || isPressed["btn-backward"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, backward, SPEED * dt);
+        vec3.scaleAndAdd(cameraCords, cameraCords, backward, speed * dt);
     if (pressedKeys.has("KeyA") || isPressed["btn-left"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, left, SPEED * dt);
+        vec3.scaleAndAdd(cameraCords, cameraCords, left, speed * dt);
     if (pressedKeys.has("KeyD") || isPressed["btn-right"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, right, SPEED * dt);
+        vec3.scaleAndAdd(cameraCords, cameraCords, right, speed * dt);
     if (pressedKeys.has("Space") || isPressed["btn-up"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, up, SPEED * dt);
+        vec3.scaleAndAdd(cameraCords, cameraCords, up, speed * dt);
     if (pressedKeys.has("ShiftLeft") || isPressed["btn-down"])
-        vec3.scaleAndAdd(cameraCords, cameraCords, down, SPEED * dt);
+        vec3.scaleAndAdd(cameraCords, cameraCords, down, speed * dt);
     if (pressedKeys.has("KeyQ") || isPressed["btn-ccw"]) {
-        quat.setAxisAngle(deltaRotation, forward, -ROLLSPEED * dt);
+        quat.setAxisAngle(deltaRotation, forward, -rollspeed * dt);
         quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     }
     if (pressedKeys.has("KeyE") || isPressed["btn-cw"]) {
-        quat.setAxisAngle(deltaRotation, forward, ROLLSPEED * dt);
+        quat.setAxisAngle(deltaRotation, forward, rollspeed * dt);
         quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     }
 }
@@ -166,4 +165,8 @@ export function reflect(pos: vec3, norm: vec3) {
     vec3.sub(temp, cameraCords, pos);
     const proj = vec3.dot(temp, norm);
     vec3.scaleAndAdd(cameraCords, cameraCords, norm, -2*proj);
+}
+
+export function setCameraPos(pos: vec3) {
+    vec3.copy(cameraCords, pos);
 }
