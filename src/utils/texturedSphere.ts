@@ -18,7 +18,7 @@ let programInfo: {
         projection: WebGLUniformLocation | null,
         lightSource: WebGLUniformLocation | null,
         ambient: WebGLUniformLocation | null,
-        modelUnit: WebGLUniformLocation | null,
+        modelNormal: WebGLUniformLocation | null,
         viewPos: WebGLUniformLocation | null,
         sampler: WebGLUniformLocation | null,
         material: {
@@ -31,7 +31,7 @@ let programInfo: {
 };
 let blackBodyProgramInfo: {
     program: WebGLProgram,
-    attribLocations: { vertexPos: number, normal: number, i_uv: number  },
+    attribLocations: { vertexPos: number, normal: number, i_uv: number },
     uniformLocations: {
         model: WebGLUniformLocation | null,
         camera: WebGLUniformLocation | null,
@@ -45,19 +45,18 @@ const vsSource = `#version 300 es
     in vec3 vertexPos;
     in vec3 normal;
     in vec2 i_uv;
-    out vec3 color;
     out vec3 FragPos;
     out vec3 Normal;
     out vec2 uv;
     uniform mat4 model;
     uniform mat4 camera;
     uniform mat4 projection;
+    uniform mat4 modelNormal;
 
     void main() {
         gl_Position = projection * camera * model * vec4(vertexPos, 1.0);
         FragPos = vec3(model * vec4(vertexPos, 1.0));
-        color = vec3(1.0, 0.0, 0.0);
-        Normal = normal;
+        Normal = normalize(mat3(modelNormal) * normal);
         uv = i_uv;
     }
 `;
@@ -69,7 +68,6 @@ const fsSource = `#version 300 es
     in vec2 uv;
     out vec4 FragColor;
     uniform float ambient;
-    uniform mat3 modelUnit;
     uniform vec3 viewPos;
     uniform vec3 lightSource;
     uniform sampler2D sampler;
@@ -138,19 +136,19 @@ function initStatic(gl: WebGL2RenderingContext) {
     for (let i = 1; i < RESOLUTION - 2; ++i)
         for (let j = 0; j < RESOLUTION; ++j)
             indices.push(
-                (RESOLUTION + 1) * i + j + 1, 
-                (RESOLUTION + 1) * (i - 1) + j + 1, 
-                (RESOLUTION + 1) * i + j + 2, 
+                (RESOLUTION + 1) * i + j + 1,
+                (RESOLUTION + 1) * (i - 1) + j + 1,
+                (RESOLUTION + 1) * i + j + 2,
 
-                (RESOLUTION + 1) * (i - 1) + j + 1, 
-                (RESOLUTION + 1) * (i - 1) + j + 2, 
+                (RESOLUTION + 1) * (i - 1) + j + 1,
+                (RESOLUTION + 1) * (i - 1) + j + 2,
                 (RESOLUTION + 1) * i + j + 2
             );
 
     for (let j = 0; j < RESOLUTION; ++j)
         indices.push(
-            cordsLength - j - 2, 
-            cordsLength - 1, 
+            cordsLength - j - 2,
+            cordsLength - 1,
             cordsLength - j - 3
         );
 
@@ -176,7 +174,7 @@ function initStatic(gl: WebGL2RenderingContext) {
             projection: gl.getUniformLocation(shaderProgram, "projection"),
             lightSource: gl.getUniformLocation(shaderProgram, "lightSource"),
             ambient: gl.getUniformLocation(shaderProgram, "ambient"),
-            modelUnit: gl.getUniformLocation(shaderProgram, "modelUnit"),
+            modelNormal: gl.getUniformLocation(shaderProgram, "modelNormal"),
             viewPos: gl.getUniformLocation(shaderProgram, "viewPos"),
             sampler: gl.getUniformLocation(shaderProgram, "sampler"),
             material: {
@@ -217,26 +215,49 @@ interface Material {
 }
 
 export default class TexturedSphere {
-    R: number;
-    model: mat4 = mat4.create();
-    modelNormal: mat4 = mat4.create();
-    _pos: vec3 = vec3.create();
-    texture: WebGLTexture;
-    constructor(gl: WebGL2RenderingContext, texture: WebGLTexture, radius: number = 1, pos: vec3 = vec3.create()) {
+    private readonly R: number;
+    private model: mat4 = mat4.create();
+    private modelNormal: mat4 = mat4.create();
+    private _pos: vec3 = vec3.create();
+    private texture: WebGLTexture;
+    private _obliquity: number = 0;
+    private _rotation: number = 0;
+    constructor(gl: WebGL2RenderingContext, texture: WebGLTexture, radius: number = 1, pos: vec3 = vec3.create(), obliquity: number = 0, rotation: number = 0) {
         if (typeof VAO === "undefined")
             initStatic(gl);
 
         this.R = radius;
         this.pos = pos;
         this.texture = texture;
+        this.obliquity = obliquity;
+        this.rotation = rotation;
+    }
+    get rotation() {
+        return this._rotation;
+    }
+    set rotation(value) {
+        this._rotation = value;
+        this.calculateModel();
+    }
+    get obliquity() {
+        return this._obliquity;
+    }
+    set obliquity(value: number) {
+        this._obliquity = value;
+        this.calculateModel();
     }
     get pos() {
         return this._pos;
     }
     set pos(value) {
         vec3.copy(this._pos, value);
-        mat4.fromTranslation(this.model, value);
-        mat4.scale(this.model, this.model, vec3.fromValues(this.R, this.R, this.R))
+        this.calculateModel();
+    }
+    calculateModel() {
+        mat4.fromTranslation(this.model, this._pos);
+        mat4.scale(this.model, this.model, vec3.fromValues(this.R, this.R, this.R));
+        mat4.rotateX(this.model, this.model, this.obliquity);
+        mat4.rotateZ(this.model, this.model, this.rotation);
         mat4.transpose(this.modelNormal, this.model);
         mat4.invert(this.modelNormal, this.modelNormal);
     }
@@ -253,6 +274,7 @@ export default class TexturedSphere {
             gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, this.model);
             gl.uniformMatrix4fv(programInfo.uniformLocations.camera, false, camera);
             gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projection);
+            gl.uniformMatrix4fv(programInfo.uniformLocations.modelNormal, false, this.modelNormal);
             gl.uniform3fv(programInfo.uniformLocations.lightSource, lightSource);
             gl.uniform3fv(programInfo.uniformLocations.viewPos, viewPos);
             gl.uniform1f(programInfo.uniformLocations.ambient, ambient);

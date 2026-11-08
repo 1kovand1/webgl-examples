@@ -6,7 +6,7 @@ declare var RuntimeExports: {
     HEAP32: Int32Array;
 };
 interface WasmModule {
-  _RK(_0: number, _1: number, _2: number, _3: number, _4: number, _5: number, _6: number): void;
+  _RK(_0: number, _1: number, _2: number, _3: number, _4: number, _5: number, _6: number, _7: number): void;
   _free(_0: number): void;
   _malloc(_0: number): number;
 }

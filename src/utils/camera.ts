@@ -77,7 +77,7 @@ canvas.addEventListener('touchmove', (e) => {
     canvas.dispatchEvent(new MouseEvent('mousemove', mockEvent));
 });
 
-canvas.addEventListener("click", async () => {
+canvas.addEventListener("touchstart", async () => {
     if (!document.fullscreenElement)
         await document.body.requestFullscreen();
 });

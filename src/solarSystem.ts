@@ -1,5 +1,5 @@
 export { };
-import { mat4, vec3 } from "gl-matrix";
+import { glMatrix, mat4, vec3 } from "gl-matrix";
 import { cameraCords, getWorldToCameraMatrix, moveBackward, processInput, setCameraPos } from "./utils/camera"
 import "./assets/controls.css"
 import { getPosition, initRK, RK4 } from "./utils/RK";
@@ -15,8 +15,12 @@ const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
 canvas.insertAdjacentHTML("beforebegin", `
 <div id="overlay">
     <div class="row hidden">
-        <span>Скорость моделирования: x<p id="modellingSpeed">1</p></span>
+        <span>Скорость моделирования: x<p id="modellingSpeed">1</p> <p class="touchControls" onclick="modellingSpeed.innerText = (window.speed *= 2).toString();">+</p> <p class="touchControls" onclick=" modellingSpeed.innerText = (window.speed /= 2).toString();">-</p></span>
         <span>Позиция: <p id="position"></p></span>
+    </div>
+    <div class="row hidden">
+        <span>Шагов РК на кадр: <p id="RKSteps"></p></span>
+        <span>FPS: <p id="FPS"></p></span>
     </div>
     <div id="textureWaitText"><p>Подождите, текстуры загружаются....</p></div>
 </div>
@@ -24,6 +28,8 @@ canvas.insertAdjacentHTML("beforebegin", `
 
 const gl = canvas.getContext('webgl2');
 const modellingSpeed = document.getElementById("modellingSpeed") as HTMLParagraphElement;
+const RKSteps = document.getElementById("RKSteps") as HTMLParagraphElement;
+const FPS = document.getElementById("FPS") as HTMLParagraphElement;
 const textureWaitText = document.getElementById("textureWaitText") as HTMLDivElement;
 const position = document.getElementById("position") as HTMLDivElement;
 
@@ -50,19 +56,20 @@ const textures = await Promise.all(Object.keys(modelData).map(d => loadTexture(g
 
 initRK(modelData);
 
-const spheres: Array<TexturedSphere> = Object.values(modelData).map((d, i) => new TexturedSphere(gl, textures[i], d.radius * 10, d.position));
+const spheres: Array<TexturedSphere> = Object.values(modelData).map((d, i) => new TexturedSphere(gl, textures[i], d.radius * 10, d.position, glMatrix.toRadian(d.obliquity ?? 0), 0));
 
 await initSkybox(gl);
-
-const projectionMatrix = mat4.create();
 
 declare global {
     interface Window {
         speed: number;
-        tp(name:string): void;
+        tp(name: string): void;
         cameraSpeed: number;
+        locked: number | null;
     }
 }
+
+window.locked = null;
 
 window.tp = function (name: string) {
     const i = Object.keys(modelData).findIndex((d) => d.toLowerCase() === name.toLowerCase());
@@ -78,9 +85,15 @@ window.addEventListener("wheel", (e) => {
 });
 
 window.addEventListener("keypress", (e) => {
-    if (!isNaN(+e.key) && +e.key < 9 && e.key !== " ") {
-        setCameraPos(getPosition(+e.key));
-        moveBackward(Object.values(modelData)[+e.key].radius * 20);
+    if (!isNaN(+e.key) && e.key !== " ") {
+        if (e.altKey) {
+            vec3.copy(lastPos, getPosition(+e.key));
+            window.locked = +e.key;
+        }
+        else {
+            setCameraPos(getPosition(+e.key));
+            moveBackward(Object.values(modelData)[+e.key].radius * 20);
+        }
     }
 })
 
@@ -89,6 +102,9 @@ window.cameraSpeed = 0.00001;
 
 textureWaitText.remove();
 document.querySelectorAll("#overlay *").forEach(x => x.classList.remove("hidden"));
+
+const projectionMatrix = mat4.create();
+const lastPos = vec3.create();
 
 let time: DOMHighResTimeStamp;
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp: DOMHighResTimeStamp) {
@@ -104,22 +120,33 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
 
     mat4.perspective(projectionMatrix, Math.PI / 4, canvas.width / canvas.height, 0.00001, Infinity);
 
-    RK4(dt * window.speed / 1000 / 3600 / 24);
+    const RKinfo = RK4(dt * window.speed / 1000 / 3600 / 24);
+    RKSteps.innerText = RKinfo.count.toString();
+    if (window.locked !== null) {
+        vec3.sub(lastPos, getPosition(window.locked), lastPos);
+        vec3.add(cameraCords, cameraCords, lastPos);
+        vec3.copy(lastPos, getPosition(window.locked))
+    }
 
-    spheres.forEach((d, i) => d.pos = getPosition(i));
+    spheres.forEach((d, i) => {
+        d.pos = getPosition(i);
+        d.rotation += (Object.values(modelData)[i].rotation ?? 0) * dt * window.speed / 1000;
+    });
     spheres[0].draw(gl, getWorldToCameraMatrix(), projectionMatrix);
     spheres.slice(1).forEach(sphere =>
         sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, getPosition(0), cameraCords, 0, {
             shininess: 1,
-            ambient: vec3.fromValues(0,0,0),
+            ambient: vec3.fromValues(0, 0, 0),
             diffuse: vec3.fromValues(0.75, 0.75, 0.75),
-            specular: vec3.fromValues(0,0,0),
+            specular: vec3.fromValues(0, 0, 0),
         })
     )
 
     gl.depthFunc(gl.LEQUAL);
     drawSkybox(gl, getWorldToCameraMatrix(), projectionMatrix);
     gl.depthFunc(gl.LESS);
+
+    FPS.innerText = (1/dt * 1000).toFixed(0).toString();
 
     requestAnimationFrame((timestamp) => render(gl, canvas, timestamp));
 }

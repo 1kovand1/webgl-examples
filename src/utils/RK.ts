@@ -36,6 +36,6 @@ export function getPosition(i: number): vec3 {
 
 
 export function RK4(dt: number, tol=1e-15) {
-    module._RK(data_ptr, Y_ptr, size, masses_ptr, G, dt, tol);
+    module._RK(data_ptr, Y_ptr, size, masses_ptr, G, dt, tol, 1000);
     return {err: module.HEAPF64[data_ptr >> 3], h: module.HEAPF64[(data_ptr >> 3) + 1], count: module.HEAP32[(data_ptr >> 2) + 4]} as wasm.RKData;
 }

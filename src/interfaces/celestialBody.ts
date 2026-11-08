@@ -3,4 +3,6 @@ export default interface celestialBody {
     radius: number,
     position: Array<number>,
     velocity: Array<number>,
+    obliquity?: number,
+    rotation?: number
 };
