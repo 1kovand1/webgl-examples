@@ -44,7 +44,6 @@ let blackBodyProgramInfo: {
 const vsSource = `#version 300 es
     in vec3 vertexPos;
     in vec3 normal;
-    out vec3 color;
     out vec3 FragPos;
     out vec3 Normal;
     uniform mat4 model;
@@ -54,7 +53,6 @@ const vsSource = `#version 300 es
     void main() {
         gl_Position = projection * camera * model * vec4(vertexPos, 1.0);
         FragPos = vec3(model * vec4(vertexPos, 1.0));
-        color = vec3(1.0, 0.0, 0.0);
         Normal = normal;
     }
 `;
@@ -231,9 +229,9 @@ export default class Sphere {
         mat4.transpose(this.modelNormal, this.model);
         mat4.invert(this.modelNormal, this.modelNormal);
     }
-    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4): void;
-    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
-    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
+    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, color: vec3): void;
+    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, color: vec3, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
+    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, color: vec3, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
         gl.bindVertexArray(VAO);
         if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined) {
             gl.useProgram(programInfo.program);
@@ -244,7 +242,7 @@ export default class Sphere {
             gl.uniform3fv(programInfo.uniformLocations.lightSource, lightSource);
             gl.uniform3fv(programInfo.uniformLocations.viewPos, viewPos);
             gl.uniform1f(programInfo.uniformLocations.ambient, ambient);
-            gl.uniform3f(programInfo.uniformLocations.color, 1, 0, 0);
+            gl.uniform3fv(programInfo.uniformLocations.color, color);
 
             gl.uniform3fv(programInfo.uniformLocations.material.ambient, material.ambient);
             gl.uniform3fv(programInfo.uniformLocations.material.diffuse, material.diffuse);
@@ -257,7 +255,7 @@ export default class Sphere {
             gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.model, false, this.model);
             gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.camera, false, camera);
             gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.projection, false, projection);
-            gl.uniform3f(blackBodyProgramInfo.uniformLocations.color, 1, 1, 1);
+            gl.uniform3fv(blackBodyProgramInfo.uniformLocations.color, color);
         }
 
         gl.drawElements(gl.TRIANGLES, elementsLength, gl.UNSIGNED_SHORT, 0);

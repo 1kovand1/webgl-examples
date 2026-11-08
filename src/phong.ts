@@ -45,7 +45,11 @@ const lightPos = vec3.fromValues(3,3,3);
 
 const light = new Sphere(gl, 1, lightPos);
 const sphere = new Sphere(gl);
-const sphere2 = new Sphere(gl, 1, vec3.fromValues(0,-1,2));
+const sphere2 = new Sphere(gl, 1, vec3.fromValues(0,-1,5));
+
+const red = vec3.fromValues(1,0,0);
+const green = vec3.fromValues(0,1,0);
+const white = vec3.fromValues(1,1,1);
 
 const projectionMatrix = mat4.create();
 
@@ -62,14 +66,14 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     
     mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);
 
-    light.draw(gl, getWorldToCameraMatrix(), projectionMatrix);
-    sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, lightPos, cameraCords, 0.5, {
+    light.draw(gl, getWorldToCameraMatrix(), projectionMatrix, white);
+    sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, red, lightPos, cameraCords, 0.5, {
         shininess: +rangeSh.value,
         ambient: vec3.fromValues(+rangeA.value / 255, +rangeA.value / 255, +rangeA.value / 255),
         diffuse: vec3.fromValues(+rangeD.value / 255, +rangeD.value / 255, +rangeD.value / 255),
         specular: vec3.fromValues(+rangeSp.value / 255, +rangeSp.value / 255, +rangeSp.value / 255),
     });
-    sphere2.draw(gl, getWorldToCameraMatrix(), projectionMatrix, lightPos, cameraCords, 0.5, {
+    sphere2.draw(gl, getWorldToCameraMatrix(), projectionMatrix, green, lightPos, cameraCords, 0.5, {
         shininess: +rangeSh.value,
         ambient: vec3.fromValues(+rangeA.value / 255, +rangeA.value / 255, +rangeA.value / 255),
         diffuse: vec3.fromValues(+rangeD.value / 255, +rangeD.value / 255, +rangeD.value / 255),

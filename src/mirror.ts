@@ -1,9 +1,9 @@
 export { };
 import { mat4, vec2, vec3 } from "gl-matrix";
-import { cameraCords, getWorldToCameraMatrix, processInput, reflect } from "./utils/camera"
-import Sphere from "./utils/sphere";
+import { getWorldToCameraMatrix, processInput, reflect } from "./utils/camera"
 import "./assets/controls.css"
-import { drawMirror, mirrorfb, createMirrorCamera, mirrorWidth, mirrorHeight } from "./utils/mirror";
+import { drawMirror, mirrorfb, mirrorWidth, mirrorHeight, getSurface } from "./utils/mirror";
+import ClippableSphere from "./utils/clippableSphere";
 document.title = "Зеркало";
 
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
@@ -14,25 +14,11 @@ if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
 }
 
-canvas.insertAdjacentHTML("beforebegin", `
-    <div id="sliders" class="controls">
-        <label> <input id="rangeD" type="range" min="0" max="255">Diffuse</label>
-        <label> <input id="rangeSh" type="range" min="0" max="255">Shininess</label>
-        <label> <input id="rangeSp" type="range" min="0" max="255">Specular</label>
-        <label> <input id="rangeA" type="range" min="0" max="255">Ambient</label>
-    </div>
-`);
-
-const rangeD = document.getElementById("rangeD") as HTMLInputElement;
-const rangeSh = document.getElementById("rangeSh") as HTMLInputElement;
-const rangeSp = document.getElementById("rangeSp") as HTMLInputElement;
-const rangeA = document.getElementById("rangeA") as HTMLInputElement;
-
 function resizeCanvas(canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 }
-resizeCanvas( canvas);
+resizeCanvas(canvas);
 window.addEventListener('resize', () => resizeCanvas(canvas));
 
 gl.enable(gl.DEPTH_TEST);
@@ -41,21 +27,29 @@ gl.depthFunc(gl.LESS);
 gl.enable(gl.CULL_FACE);
 gl.cullFace(gl.BACK);
 
-const lightPos = vec3.fromValues(3, 3, 3);
 
-const light = new Sphere(gl, 1, lightPos);
-const sphere = new Sphere(gl);
-const sphere2 = new Sphere(gl, 1, vec3.fromValues(0, -1, 2));
+const sphere = new ClippableSphere(gl);
+const sphere2 = new ClippableSphere(gl, 1, vec3.fromValues(0, -1, 5));
+const sphere3 = new ClippableSphere(gl, 1, vec3.fromValues(0, -1, -7));
 
 const mirrorPos = vec3.fromValues(0, 0, -5);
 const mirrorNorm = vec3.fromValues(0, 0, -1);
 
-const mirrorSize = vec2.fromValues(10,10);
+const mirrorSize = vec2.fromValues(10, 10);
+
+const red = vec3.fromValues(1, 0, 0);
+const green = vec3.fromValues(0, 1, 0);
+const blue = vec3.fromValues(0, 0, 1);
+
+gl.stencilFunc(gl.EQUAL, 1, 0xFF);
 
 let time: DOMHighResTimeStamp;
+const projectionMatrix = mat4.create();
 function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp: DOMHighResTimeStamp) {
     if (time === undefined)
         time = timestamp;
+    mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);
+
     const dt = timestamp - time;
     time = timestamp;
     processInput(dt);
@@ -63,58 +57,47 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     gl.bindFramebuffer(gl.FRAMEBUFFER, mirrorfb);
     gl.viewport(0, 0, mirrorWidth, mirrorHeight);
 
-
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
 
-    reflect(mirrorPos, mirrorNorm); 
-
-    const projectionMatrix = mat4.create();
-    mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);
-    mat4.multiply(projectionMatrix, createMirrorCamera(mirrorPos, mirrorNorm, getWorldToCameraMatrix(), projectionMatrix, mirrorSize), projectionMatrix);
+    reflect(mirrorPos, mirrorNorm);
 
     gl.cullFace(gl.FRONT);
+    gl.enable(gl.STENCIL_TEST);
+    gl.depthMask(false);
+    gl.stencilMask(0xFF);
+    gl.colorMask(false, false, false, false);
+    gl.stencilOp(gl.KEEP, gl.KEEP, gl.REPLACE)
 
-    light.draw(gl, getWorldToCameraMatrix(), projectionMatrix);
-    sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, lightPos, cameraCords, 0.5, {
-        shininess: +rangeSh.value,
-        ambient: vec3.fromValues(+rangeA.value / 255, +rangeA.value / 255, +rangeA.value / 255),
-        diffuse: vec3.fromValues(+rangeD.value / 255, +rangeD.value / 255, +rangeD.value / 255),
-        specular: vec3.fromValues(+rangeSp.value / 255, +rangeSp.value / 255, +rangeSp.value / 255),
-    });
-    sphere2.draw(gl, getWorldToCameraMatrix(), projectionMatrix, lightPos, cameraCords, 0.5, {
-        shininess: +rangeSh.value,
-        ambient: vec3.fromValues(+rangeA.value / 255, +rangeA.value / 255, +rangeA.value / 255),
-        diffuse: vec3.fromValues(+rangeD.value / 255, +rangeD.value / 255, +rangeD.value / 255),
-        specular: vec3.fromValues(+rangeSp.value / 255, +rangeSp.value / 255, +rangeSp.value / 255),
-    });
+    drawMirror(mirrorPos, mirrorNorm, getWorldToCameraMatrix(), projectionMatrix, mirrorSize, true);
 
+    gl.stencilFunc(gl.EQUAL, 1, 0xFF);
+    gl.depthMask(true);
+    gl.colorMask(true, true, true, true);
+    gl.stencilMask(0xFF);
+    gl.stencilOp(gl.REPLACE,gl.REPLACE,gl.REPLACE);
 
+    const clipSurface = getSurface(mirrorPos, mirrorNorm, getWorldToCameraMatrix(), mirrorSize);
+
+    sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, red, clipSurface);
+    sphere2.draw(gl, getWorldToCameraMatrix(), projectionMatrix, green, clipSurface);
+    sphere3.draw(gl, getWorldToCameraMatrix(), projectionMatrix, blue, clipSurface);
+
+    gl.disable(gl.STENCIL_TEST);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.stencilMask(0);
 
     reflect(mirrorPos, mirrorNorm);
     gl.cullFace(gl.BACK);
+    gl.disable(gl.STENCIL_TEST);
 
-    
-
-    mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.1, 100.0);
-    drawMirror(mirrorPos, mirrorNorm, getWorldToCameraMatrix(), projectionMatrix, mirrorSize, lightPos, cameraCords);
-    light.draw(gl, getWorldToCameraMatrix(), projectionMatrix);
-    sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, lightPos, cameraCords, 0.5, {
-        shininess: +rangeSh.value,
-        ambient: vec3.fromValues(+rangeA.value / 255, +rangeA.value / 255, +rangeA.value / 255),
-        diffuse: vec3.fromValues(+rangeD.value / 255, +rangeD.value / 255, +rangeD.value / 255),
-        specular: vec3.fromValues(+rangeSp.value / 255, +rangeSp.value / 255, +rangeSp.value / 255),
-    });
-    sphere2.draw(gl, getWorldToCameraMatrix(), projectionMatrix, lightPos, cameraCords, 0.5, {
-        shininess: +rangeSh.value,
-        ambient: vec3.fromValues(+rangeA.value / 255, +rangeA.value / 255, +rangeA.value / 255),
-        diffuse: vec3.fromValues(+rangeD.value / 255, +rangeD.value / 255, +rangeD.value / 255),
-        specular: vec3.fromValues(+rangeSp.value / 255, +rangeSp.value / 255, +rangeSp.value / 255),
-    });
+    drawMirror(mirrorPos, mirrorNorm, getWorldToCameraMatrix(), projectionMatrix, mirrorSize, false);
+    sphere.draw(gl, getWorldToCameraMatrix(), projectionMatrix, red);
+    sphere2.draw(gl, getWorldToCameraMatrix(), projectionMatrix, green);
+    sphere3.draw(gl, getWorldToCameraMatrix(), projectionMatrix, blue);
 
 
     requestAnimationFrame((timestamp) => render(gl, canvas, timestamp));

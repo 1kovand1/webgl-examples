@@ -16,9 +16,11 @@ if (!gl) {
 canvas.insertAdjacentHTML("beforebegin", `
     <div class="controls">
         <button id="depthButton" style="background: mediumseagreen;">Выключить тест глубины</button>
+        <button id="cullButton" style="background: mediumseagreen;">Отбрасывать передние грани</button>
     </div>
 `);
 const depthButton = document.getElementById("depthButton") as HTMLButtonElement;
+const cullButton = document.getElementById("cullButton") as HTMLButtonElement;
 depthButton?.addEventListener("click", () => {
     if (gl.isEnabled(gl.DEPTH_TEST)) {
         gl.disable(gl.DEPTH_TEST);
@@ -29,6 +31,18 @@ depthButton?.addEventListener("click", () => {
         gl.enable(gl.DEPTH_TEST);
         depthButton.innerText = "Выключить тест глубины";
         depthButton.style.background = "mediumseagreen";
+    }
+})
+cullButton?.addEventListener("click", () => {
+    if (gl.getParameter(gl.CULL_FACE_MODE) === gl.BACK) {
+        gl.cullFace(gl.FRONT);
+        cullButton.innerText = "Отбрасывать задние грани";
+        cullButton.style.background = "lightcoral";
+    }
+    else {
+        gl.cullFace(gl.BACK);
+        cullButton.innerText = "Отбрасывать передние грани";
+        cullButton.style.background = "mediumseagreen";
     }
 })
 
@@ -128,6 +142,8 @@ const indices = new Uint16Array([
     20, 21, 22,     20, 22, 23,   // Левая
 ]);
 
+gl.enable(gl.CULL_FACE);
+gl.cullFace(gl.BACK);
 
 const vao = gl.createVertexArray();
 gl.bindVertexArray(vao);
