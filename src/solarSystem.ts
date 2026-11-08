@@ -84,11 +84,12 @@ window.addEventListener("wheel", (e) => {
         modellingSpeed.innerText = (window.speed /= 2).toString();
 });
 
-window.addEventListener("keypress", (e) => {
+window.addEventListener("keydown", (e) => {
     if (!isNaN(+e.key) && e.key !== " ") {
-        if (e.altKey) {
+        if (e.ctrlKey) {
             vec3.copy(lastPos, getPosition(+e.key));
             window.locked = +e.key;
+            e.preventDefault();
         }
         else {
             setCameraPos(getPosition(+e.key));
