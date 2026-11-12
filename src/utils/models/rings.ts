@@ -30,11 +30,9 @@ const fsSource = `#version 300 es
     in vec2 uv;
     out vec4 FragColor;
     uniform float ambient;
-    uniform float nearPlane;
     uniform vec3 viewPos;
     uniform vec3 lightSource;
     uniform sampler2D sampler;
-    uniform samplerCubeShadow shadowSampler;
 
     struct Material {
         vec3 ambient;
@@ -43,21 +41,6 @@ const fsSource = `#version 300 es
         float shininess;
     };
     uniform Material material;
-
-
-    float calculateShadow(vec3 fragPos) {
-        vec3 fragToLight = fragPos - lightSource;
-        vec3 absVec = abs(fragToLight);
-
-        float bias = 0.0000004;
-        float Z = max(absVec.x, max(absVec.y, absVec.z)) ;
-
-        float currentDepth = (1./Z - 1./nearPlane) / (1./50. - 1./nearPlane) - bias;
-        
-        float shadow = texture(shadowSampler, vec4(fragToLight, currentDepth));
-        
-        return shadow;
-    }
 
     void main()
     {
@@ -79,7 +62,7 @@ const fsSource = `#version 300 es
         float diff = max(dot(normal, lightDir), 0.0);
         vec3 diffuse = diff * lightColor * material.diffuse;
 
-        FragColor = vec4((ambient + (diffuse + specular) * calculateShadow(FragPos)) * color, 1.0);
+        FragColor = vec4((ambient + diffuse + specular) * color, 1.0);
     }
 `;
 
@@ -159,8 +142,6 @@ export default class Ring {
                 modelNormal: gl.getUniformLocation(shaderProgram, "modelNormal"),
                 viewPos: gl.getUniformLocation(shaderProgram, "viewPos"),
                 sampler: gl.getUniformLocation(shaderProgram, "sampler"),
-                shadowSampler: gl.getUniformLocation(shaderProgram, "shadowSampler"),
-                nearPlane: gl.getUniformLocation(shaderProgram, "nearPlane"),
                 material: {
                     ambient: gl.getUniformLocation(shaderProgram, "material.ambient"),
                     diffuse: gl.getUniformLocation(shaderProgram, "material.diffuse"),
@@ -212,18 +193,15 @@ export default class Ring {
         this.calculateModel();
     }
     draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4): void;
-        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane: number, shadowTexture: WebGLTexture, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
-        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane?: number, shadowTexture?: WebGLTexture, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
+        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
+        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
             gl.bindVertexArray(this.VAO);
-            if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined && shadowTexture !== undefined && nearPlane !== undefined) {
+            if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined) {
                 gl.useProgram(this.programInfo.program);
     
                 gl.activeTexture(gl.TEXTURE0);
                 gl.bindTexture(gl.TEXTURE_2D, this.texture);
                 gl.uniform1i(this.programInfo.uniformLocations.sampler, 0);
-                gl.activeTexture(gl.TEXTURE1);
-                gl.bindTexture(gl.TEXTURE_CUBE_MAP, shadowTexture);
-                gl.uniform1i(this.programInfo.uniformLocations.shadowSampler, 1);
     
                 gl.uniformMatrix4fv(this.programInfo.uniformLocations.model, false, this.model);
                 gl.uniformMatrix4fv(this.programInfo.uniformLocations.view, false, view);
@@ -232,7 +210,6 @@ export default class Ring {
                 gl.uniform3fv(this.programInfo.uniformLocations.lightSource, lightSource);
                 gl.uniform3fv(this.programInfo.uniformLocations.viewPos, viewPos);
                 gl.uniform1f(this.programInfo.uniformLocations.ambient, ambient);
-                gl.uniform1f(this.programInfo.uniformLocations.nearPlane, nearPlane);
     
                 gl.uniform3fv(this.programInfo.uniformLocations.material.ambient, material.ambient);
                 gl.uniform3fv(this.programInfo.uniformLocations.material.diffuse, material.diffuse);
