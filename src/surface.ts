@@ -7,7 +7,7 @@ document.title = "Поверхность";
 
 const canvas = document.getElementById('glCanvas') as HTMLCanvasElement;
 
-const gl = canvas.getContext('webgl2');
+const gl = canvas.getContext('webgl2') as WebGL2RenderingContext;
 
 if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
@@ -16,12 +16,24 @@ if (!gl) {
 canvas.insertAdjacentHTML("beforebegin", `
     <div class="controls">
         <label> <input id="rangePatches" type="range" min="1" max="255" value="4">Количество патчей <p id="pathesP">4</p></label>
+        <label>X= <input id="inputX" value="(1 + v / 2 * Math.cos(u / 2)) * Math.cos(u)"></label>
+        <label>Y= <input id="inputY" value="(1 + v / 2 * Math.cos(u / 2)) * Math.sin(u)"></label>
+        <label>Z= <input id="inputZ" value="v / 2 * Math.sin(u / 2)"></label>
+        <span style="width: fit-content;color: white;margin:auto"><input id="uMin" value="-Math.PI">≤u≤<input id="uMax" value="Math.PI"></span>
+        <span style="width: fit-content;color: white;margin:auto"><input id="vMin" value="-Math.PI">≤v≤<input id="vMax" value="Math.PI"></span>
     </div>
 `);
 const rangePatches = document.getElementById("rangePatches") as HTMLInputElement;
+const inputX = document.getElementById("inputX") as HTMLInputElement;
+const inputY = document.getElementById("inputY") as HTMLInputElement;
+const inputZ = document.getElementById("inputZ") as HTMLInputElement;
+const uMin = document.getElementById("uMin") as HTMLInputElement;
+const uMax = document.getElementById("uMax") as HTMLInputElement;
+const vMin = document.getElementById("uMin") as HTMLInputElement;
+const vMax = document.getElementById("uMax") as HTMLInputElement;
 const pathesP = document.getElementById("pathesP") as HTMLParagraphElement;
 
-rangePatches.max = Math.floor((Math.sqrt(gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS) - 12) - 1) / 3).toString();
+rangePatches.max = Math.floor((Math.sqrt(gl.getParameter(gl.MAX_TEXTURE_SIZE)) - 1) / 3).toString();
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -37,13 +49,13 @@ const vsSource = `#version 300 es
 
     layout(location = 0) in vec2 uv;
 
-    uniform vec3 controlPoints[(3 * PATCH_COUNT + 1) * (3 * PATCH_COUNT + 1)];
+    uniform sampler2D controlTexture;
+    uniform int PATCH_COUNT;
 
     uniform mat4 projection;
     uniform mat4 view;
     uniform mat4 model;
 
-    out vec3 fragNormal;
     out vec3 fragPosition;
     out float z;
 
@@ -54,7 +66,7 @@ const vsSource = `#version 300 es
         int x = patchX * 3 + i;
         int y = patchY * 3 + j;
 
-        return controlPoints[y * (3 * PATCH_COUNT + 1) + x];
+        return texelFetch(controlTexture, ivec2(x,y), 0).rgb;
     }
 
     vec4 bernstein(float t) {
@@ -87,12 +99,6 @@ const vsSource = `#version 300 es
         vec4 bu = bernstein(uv.x);
         vec4 bv = bernstein(uv.y);
 
-        vec4 du = bernsteinDerivative(uv.x);
-        vec4 dv = bernsteinDerivative(uv.y);
-
-        vec3 pu = vec3(0.0);
-        vec3 pv = vec3(0.0);
-
         position = vec3(0.0);
 
         for (int i = 0; i < 4; ++i) {
@@ -100,13 +106,8 @@ const vsSource = `#version 300 es
                 vec3 p = getControlPoint(i, j);
 
                 position += p * bu[i] * bv[j];
-
-                pu += p * du[i] * bv[j];
-                pv += p * bu[i] * dv[j];
             }
         }
-
-        normal = normalize(cross(pu, pv));
     }
 
     void main() {
@@ -118,9 +119,6 @@ const vsSource = `#version 300 es
         vec4 worldPosition = model * vec4(position, 1.0);
 
         fragPosition = worldPosition.xyz;
-        fragNormal = normalize(
-            mat3(transpose(inverse(model))) * normal
-        );
         z = worldPosition.z;
         gl_Position = projection * view * worldPosition;
     }
@@ -157,7 +155,7 @@ const linesfsSource = `#version 300 es
 `;
 
 let PATCH_COUNT = 4;
-let shaderProgram = initShaderProgram(gl, vsSource.replace(/PATCH_COUNT/g, PATCH_COUNT.toString()), fsSource);
+let shaderProgram = initShaderProgram(gl, vsSource, fsSource);
 let programInfo = {
     program: shaderProgram,
     attribLocations: { uv: 0 },
@@ -165,7 +163,8 @@ let programInfo = {
         model: gl.getUniformLocation(shaderProgram, "model"),
         view: gl.getUniformLocation(shaderProgram, "view"),
         projection: gl.getUniformLocation(shaderProgram, "projection"),
-        controlPoints: gl.getUniformLocation(shaderProgram, "controlPoints[0]"),
+        controlTexture: gl.getUniformLocation(shaderProgram, "controlTexture"),
+        PATCH_COUNT: gl.getUniformLocation(shaderProgram, "PATCH_COUNT"),
     },
 };
 
@@ -243,52 +242,62 @@ const linesu_vbo = gl.createBuffer();
 const cordsvu: Array<number> = [];
 
 const linesv_vbo = gl.createBuffer();
+const texture = gl.createTexture();
 
-rangePatches.addEventListener("input", () => {
+gl.bindTexture(gl.TEXTURE_2D, texture);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+function recalcPoints() {
     PATCH_COUNT = +rangePatches.value;
     pathesP.innerText = PATCH_COUNT.toString();
-    shaderProgram = initShaderProgram(gl, vsSource.replace(/PATCH_COUNT/g, PATCH_COUNT.toString()), fsSource);
-    programInfo = {
-        program: shaderProgram,
-        attribLocations: { uv: 0 },
-        uniformLocations: {
-            model: gl.getUniformLocation(shaderProgram, "model"),
-            view: gl.getUniformLocation(shaderProgram, "view"),
-            projection: gl.getUniformLocation(shaderProgram, "projection"),
-            controlPoints: gl.getUniformLocation(shaderProgram, "controlPoints[0]"),
-        }
-    }
-    gl.useProgram(programInfo.program);
-
+    gl.bindTexture(gl.TEXTURE_2D, texture);
     RESOLUTION = 3 * PATCH_COUNT + 1;
+
+    const funcX = new Function("u", "v", "return " + inputX.value);
+    const funcY = new Function("u", "v", "return " + inputY.value);
+    const funcZ = new Function("u", "v", "return " + inputZ.value);
+
+    const uMinValue = eval(uMin.value);
+    const uMaxValue = eval(uMax.value);
+    const vMinValue = eval(vMin.value);
+    const vMaxValue = eval(vMax.value);
+
     cords.length = 0;
     for (let i = 0; i < RESOLUTION; ++i)
         for (let j = 0; j < RESOLUTION; ++j) {
-            const u = -Math.PI + i % RESOLUTION * 2 * Math.PI / (RESOLUTION - 1);
-            const v = -Math.PI + j % RESOLUTION * 2 * Math.PI / (RESOLUTION - 1)
+            const u = uMinValue + i % RESOLUTION * (uMaxValue - uMinValue) / (RESOLUTION - 1);
+            const v = vMinValue + j % RESOLUTION  * (vMaxValue - vMinValue) / (RESOLUTION - 1)
             cords.push(
-                (1 + v / 2 * Math.cos(u / 2)) * Math.cos(u),
-                (1 + v / 2 * Math.cos(u / 2)) * Math.sin(u),
-                v / 2 * Math.sin(u / 2)
+                funcX(u,v),
+                funcY(u,v),
+                funcZ(u,v),
             );
         }
     const cordsArray = new Float32Array(cords);
-    gl.uniform3fv(programInfo.uniformLocations.controlPoints, cordsArray);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB32F, RESOLUTION, RESOLUTION, 0, gl.RGB, gl.FLOAT, cordsArray);
     gl.bindBuffer(gl.ARRAY_BUFFER, linesu_vbo);
     gl.bufferData(gl.ARRAY_BUFFER, cordsArray, gl.STATIC_DRAW);
-    
+
     cordsvu.length = 0;
     for (let i = 0; i < RESOLUTION; ++i)
-    for (let j = 0; j < RESOLUTION; ++j) {
-        const start = 3 * (RESOLUTION * j + i);
-        cordsvu.push(cords[start], cords[start + 1], cords[start + 2]);
-    }
+        for (let j = 0; j < RESOLUTION; ++j) {
+            const start = 3 * (RESOLUTION * j + i);
+            cordsvu.push(cords[start], cords[start + 1], cords[start + 2]);
+        }
     gl.bindVertexArray(lines_vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, linesv_vbo);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(cordsvu), gl.STATIC_DRAW);
-});
+}
 
-rangePatches.dispatchEvent(new InputEvent("input"));
+rangePatches.addEventListener("input", recalcPoints);
+inputX.addEventListener("change", recalcPoints);
+inputY.addEventListener("change", recalcPoints);
+inputZ.addEventListener("change", recalcPoints);
+
+recalcPoints();
 
 gl.enableVertexAttribArray(0);
 gl.bindVertexArray(null);
@@ -317,7 +326,11 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
     gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, modelMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.view, false, cameraMatrix);
     gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projectionMatrix);
+    gl.uniform1i(programInfo.uniformLocations.PATCH_COUNT, PATCH_COUNT);
+    gl.uniform1i(programInfo.uniformLocations.controlTexture, 0);
     gl.bindVertexArray(vao);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
 
     gl.drawElementsInstanced(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0, PATCH_COUNT ** 2);
 

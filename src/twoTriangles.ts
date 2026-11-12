@@ -73,6 +73,8 @@ gl.enableVertexAttribArray(programInfo.attribLocations.vertexPos);
 gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 0, 0);
 
 gl.clearColor(0.1, 0.1, 0.1, 1.0);
+gl.clear(gl.COLOR_BUFFER_BIT);
+
 gl.useProgram(programInfo.program);
 
 gl.bindVertexArray(vao1);

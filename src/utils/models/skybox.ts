@@ -1,6 +1,6 @@
 import type { mat4 } from "gl-matrix";
-import { loadCubeTexture } from "./loadTexture";
-import initShaderProgram from "./shaderProgram";
+import { loadCubeTexture } from "../loadTexture";
+import initShaderProgram from "../shaderProgram";
 
 const vsSource = `#version 300 es
     precision highp float;

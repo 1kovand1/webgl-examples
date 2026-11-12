@@ -46,7 +46,6 @@ cullButton?.addEventListener("click", () => {
     }
 })
 
-// Подгоняем размер холста под экран
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;

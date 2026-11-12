@@ -1,5 +1,5 @@
 import { mat4, quat, vec2, vec3, vec4 } from "gl-matrix";
-import initShaderProgram from "./shaderProgram";
+import initShaderProgram from "../shaderProgram";
 
 const vsSource = `#version 300 es
 precision highp float;

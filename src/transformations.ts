@@ -11,7 +11,6 @@ if (!gl) {
     throw new Error('WebGL 2 не поддерживается вашим браузером');
 }
 
-// Подгоняем размер холста под экран
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;

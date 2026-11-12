@@ -22,11 +22,6 @@ const rangeR = document.getElementById("rangeR") as HTMLInputElement;
 const rangeG = document.getElementById("rangeG") as HTMLInputElement;
 const rangeB = document.getElementById("rangeB") as HTMLInputElement;
 
-rangeR.addEventListener("input", () =>draw(gl));
-rangeG.addEventListener("input", () =>draw(gl));
-rangeB.addEventListener("input", () =>draw(gl));
-
-// Подгоняем размер холста под экран
 function resizeCanvas(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement) {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -51,7 +46,7 @@ const fsSource = `#version 300 es
 `;
 
 function initShaderProgram(gl: WebGL2RenderingContext, vsSource: string, fsSource: string) {
-    const loadShader = (gl: WebGL2RenderingContext, type: number, source: string) => {
+    function loadShader (gl: WebGL2RenderingContext, type: number, source: string) {
         const shader = gl.createShader(type);
         if (shader === null)
           throw new Error("Could not create shader");
@@ -94,11 +89,15 @@ gl.enableVertexAttribArray(programInfo.attribLocations.vertexPos);
 gl.vertexAttribPointer(programInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 0, 0);
 
 function draw(gl: WebGL2RenderingContext) {
-    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.clearColor(0.1, 0.1, 0.1, 1.0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(programInfo.program);
     gl.uniform3f(programInfo.uniformLocations.color, +rangeR.value / 255.,+rangeG.value / 255., +rangeB.value / 255.);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 }
+
+rangeR.addEventListener("input", () =>draw(gl));
+rangeG.addEventListener("input", () =>draw(gl));
+rangeB.addEventListener("input", () =>draw(gl));
 
 draw(gl);

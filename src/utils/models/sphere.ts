@@ -1,5 +1,6 @@
 import { mat4, vec3 } from 'gl-matrix';
-import initShaderProgram from './shaderProgram';
+import initShaderProgram from '../shaderProgram';
+import type Material from '../../interfaces/material';
 
 const RESOLUTION = 100;
 
@@ -11,16 +12,16 @@ let elementsLength: number;
 
 let programInfo: {
     program: WebGLProgram,
-    attribLocations: { vertexPos: number, normal: number, i_uv: number },
+    attribLocations: { vertexPos: number, normal: number },
     uniformLocations: {
         model: WebGLUniformLocation | null,
-        camera: WebGLUniformLocation | null,
+        view: WebGLUniformLocation | null,
         projection: WebGLUniformLocation | null,
         lightSource: WebGLUniformLocation | null,
         ambient: WebGLUniformLocation | null,
-        modelNormal: WebGLUniformLocation | null,
+        modelUnit: WebGLUniformLocation | null,
         viewPos: WebGLUniformLocation | null,
-        sampler: WebGLUniformLocation | null,
+        color: WebGLUniformLocation | null,
         material: {
             ambient: WebGLUniformLocation | null,
             diffuse: WebGLUniformLocation | null,
@@ -31,12 +32,12 @@ let programInfo: {
 };
 let blackBodyProgramInfo: {
     program: WebGLProgram,
-    attribLocations: { vertexPos: number, normal: number, i_uv: number },
+    attribLocations: { vertexPos: number, normal: number },
     uniformLocations: {
         model: WebGLUniformLocation | null,
-        camera: WebGLUniformLocation | null,
+        view: WebGLUniformLocation | null,
         projection: WebGLUniformLocation | null,
-        sampler: WebGLUniformLocation | null,
+        color: WebGLUniformLocation | null,
     },
 };
 
@@ -44,20 +45,16 @@ let blackBodyProgramInfo: {
 const vsSource = `#version 300 es
     in vec3 vertexPos;
     in vec3 normal;
-    in vec2 i_uv;
     out vec3 FragPos;
     out vec3 Normal;
-    out vec2 uv;
     uniform mat4 model;
-    uniform mat4 camera;
+    uniform mat4 view;
     uniform mat4 projection;
-    uniform mat4 modelNormal;
 
     void main() {
-        gl_Position = projection * camera * model * vec4(vertexPos, 1.0);
+        gl_Position = projection * view * model * vec4(vertexPos, 1.0);
         FragPos = vec3(model * vec4(vertexPos, 1.0));
-        Normal = normalize(mat3(modelNormal) * normal);
-        uv = i_uv;
+        Normal = normal;
     }
 `;
 
@@ -65,12 +62,12 @@ const fsSource = `#version 300 es
     precision highp float;
     in vec3 FragPos;
     in vec3 Normal;
-    in vec2 uv;
     out vec4 FragColor;
     uniform float ambient;
+    uniform mat3 modelUnit;
     uniform vec3 viewPos;
+    uniform vec3 color;
     uniform vec3 lightSource;
-    uniform sampler2D sampler;
 
     struct Material {
         vec3 ambient;
@@ -84,7 +81,7 @@ const fsSource = `#version 300 es
     void main()
     {
         vec3 lightDir = normalize(lightSource - FragPos.xyz);
-        vec3 color = vec3(texture(sampler, uv));
+
         vec3 lightColor = vec3(1.0);
         vec3 ambient = lightColor * material.ambient;
         vec3 normal = normalize(Normal);
@@ -93,7 +90,7 @@ const fsSource = `#version 300 es
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
         vec3 specular = lightColor * (spec * material.specular);
 
-        float diff = max(dot(Normal, lightDir), 0.0);
+        float diff = max(dot(normal, lightDir), 0.0);
         vec3 diffuse = diff * lightColor * material.diffuse;
 
         FragColor = vec4((ambient + diffuse + specular) * color, 1.0);
@@ -102,54 +99,53 @@ const fsSource = `#version 300 es
 
 const bbfsSource = `#version 300 es
     precision highp float;
-    uniform sampler2D sampler;
-    in vec2 uv;
+    uniform vec3 color;
     out vec4 FragColor;
     void main()
     {
-        FragColor = texture(sampler, uv);
+        FragColor = vec4(color, 1.0);
     }
 `;
 
 
 function initStatic(gl: WebGL2RenderingContext) {
     const cords: Array<number> = [];
-    cords.push(0, 0, -1, 0.5, 1);
+    cords.push(0, 0, -1);
     for (let i = 1; i < RESOLUTION - 1; ++i)
-        for (let j = 0; j < RESOLUTION + 1; ++j) {
+        for (let j = 0; j < RESOLUTION; ++j) {
             const phi = j * 2 * Math.PI / RESOLUTION;
-            const theta = -Math.PI / 2 + i * Math.PI / RESOLUTION;
-            cords.push(Math.cos(phi) * Math.cos(theta), Math.sin(phi) * Math.cos(theta), Math.sin(theta), j / RESOLUTION, 1 - i / RESOLUTION);
+            const theta = -Math.PI / 2 + i * Math.PI / (RESOLUTION - 1);
+            cords.push(Math.cos(phi) * Math.cos(theta), Math.sin(phi) * Math.cos(theta), Math.sin(theta));
         }
-    cords.push(0, 0, 1, 0.5, 0);
+    cords.push(0, 0, 1);
 
-    cordsLength = cords.length / 5;
+    cordsLength = cords.length;
 
     const indices: Array<number> = [];
     for (let j = 0; j < RESOLUTION; ++j)
         indices.push(
             j + 1,
             0,
-            j + 2
+            j < RESOLUTION - 1 ? j + 2 : 1
         );
 
     for (let i = 1; i < RESOLUTION - 2; ++i)
         for (let j = 0; j < RESOLUTION; ++j)
             indices.push(
-                (RESOLUTION + 1) * i + j + 1,
-                (RESOLUTION + 1) * (i - 1) + j + 1,
-                (RESOLUTION + 1) * i + j + 2,
+                RESOLUTION * i + j + 1, 
+                RESOLUTION * (i - 1) + j + 1, 
+                j < RESOLUTION - 1 ? RESOLUTION * i + j + 2 : RESOLUTION * i + 1, 
 
-                (RESOLUTION + 1) * (i - 1) + j + 1,
-                (RESOLUTION + 1) * (i - 1) + j + 2,
-                (RESOLUTION + 1) * i + j + 2
+                RESOLUTION * (i - 1) + j + 1, 
+                j < RESOLUTION - 1 ? RESOLUTION * (i - 1) + j + 2 : RESOLUTION * (i - 1) + 1, 
+                j < RESOLUTION - 1 ? RESOLUTION * i + j + 2 : RESOLUTION * i + 1
             );
 
     for (let j = 0; j < RESOLUTION; ++j)
         indices.push(
-            cordsLength - j - 2,
-            cordsLength - 1,
-            cordsLength - j - 3
+            cordsLength / 3 - j - 2, 
+            cordsLength / 3 - 1, 
+            j < RESOLUTION - 1 ? cordsLength / 3 - j - 3 : cordsLength / 3 - 2
         );
 
     elementsLength = indices.length;
@@ -167,16 +163,16 @@ function initStatic(gl: WebGL2RenderingContext) {
     const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
     programInfo = {
         program: shaderProgram,
-        attribLocations: { vertexPos: gl.getAttribLocation(shaderProgram, 'vertexPos'), normal: gl.getAttribLocation(shaderProgram, 'normal'), i_uv: gl.getAttribLocation(shaderProgram, 'i_uv') },
+        attribLocations: { vertexPos: gl.getAttribLocation(shaderProgram, 'vertexPos'), normal: gl.getAttribLocation(shaderProgram, 'normal') },
         uniformLocations: {
             model: gl.getUniformLocation(shaderProgram, "model"),
-            camera: gl.getUniformLocation(shaderProgram, "camera"),
+            view: gl.getUniformLocation(shaderProgram, "view"),
             projection: gl.getUniformLocation(shaderProgram, "projection"),
             lightSource: gl.getUniformLocation(shaderProgram, "lightSource"),
             ambient: gl.getUniformLocation(shaderProgram, "ambient"),
-            modelNormal: gl.getUniformLocation(shaderProgram, "modelNormal"),
+            modelUnit: gl.getUniformLocation(shaderProgram, "modelUnit"),
             viewPos: gl.getUniformLocation(shaderProgram, "viewPos"),
-            sampler: gl.getUniformLocation(shaderProgram, "sampler"),
+            color: gl.getUniformLocation(shaderProgram, "color"),
             material: {
                 ambient: gl.getUniformLocation(shaderProgram, "material.ambient"),
                 diffuse: gl.getUniformLocation(shaderProgram, "material.diffuse"),
@@ -188,96 +184,60 @@ function initStatic(gl: WebGL2RenderingContext) {
     const bbshaderProgram = initShaderProgram(gl, vsSource, bbfsSource);
     blackBodyProgramInfo = {
         program: bbshaderProgram,
-        attribLocations: { vertexPos: gl.getAttribLocation(bbshaderProgram, 'vertexPos'), normal: gl.getAttribLocation(bbshaderProgram, 'normal'), i_uv: gl.getAttribLocation(shaderProgram, 'i_uv') },
+        attribLocations: { vertexPos: gl.getAttribLocation(bbshaderProgram, 'vertexPos'), normal: gl.getAttribLocation(bbshaderProgram, 'normal') },
         uniformLocations: {
             model: gl.getUniformLocation(bbshaderProgram, "model"),
-            camera: gl.getUniformLocation(bbshaderProgram, "camera"),
+            view: gl.getUniformLocation(bbshaderProgram, "view"),
             projection: gl.getUniformLocation(bbshaderProgram, "projection"),
-            sampler: gl.getUniformLocation(bbshaderProgram, "sampler"),
+            color: gl.getUniformLocation(bbshaderProgram, "color"),
         },
     };
 
-    gl.vertexAttribPointer(blackBodyProgramInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 20, 0);
-    gl.vertexAttribPointer(blackBodyProgramInfo.attribLocations.normal, 3, gl.FLOAT, false, 20, 0);
-    gl.vertexAttribPointer(blackBodyProgramInfo.attribLocations.i_uv, 2, gl.FLOAT, false, 20, 12);
+    gl.vertexAttribPointer(blackBodyProgramInfo.attribLocations.vertexPos, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(blackBodyProgramInfo.attribLocations.normal, 3, gl.FLOAT, false, 0, 0);
     gl.enableVertexAttribArray(blackBodyProgramInfo.attribLocations.vertexPos);
     gl.enableVertexAttribArray(blackBodyProgramInfo.attribLocations.normal);
-    gl.enableVertexAttribArray(blackBodyProgramInfo.attribLocations.i_uv);
 
     gl.bindVertexArray(null);
 }
 
-interface Material {
-    shininess: number,
-    diffuse: vec3,
-    specular: vec3,
-    ambient: vec3,
-}
 
-export default class TexturedSphere {
-    private readonly R: number;
-    private model: mat4 = mat4.create();
-    private modelNormal: mat4 = mat4.create();
-    private _pos: vec3 = vec3.create();
-    private texture: WebGLTexture;
-    private _obliquity: number = 0;
-    private _rotation: number = 0;
-    constructor(gl: WebGL2RenderingContext, texture: WebGLTexture, radius: number = 1, pos: vec3 = vec3.create(), obliquity: number = 0, rotation: number = 0) {
+export default class Sphere {
+    R: number;
+    model: mat4 = mat4.create();
+    modelNormal: mat4 = mat4.create();
+    _pos: vec3 = vec3.create();
+    constructor(gl: WebGL2RenderingContext, radius: number = 1, pos: vec3 = vec3.create()) {
         if (typeof VAO === "undefined")
             initStatic(gl);
 
         this.R = radius;
         this.pos = pos;
-        this.texture = texture;
-        this.obliquity = obliquity;
-        this.rotation = rotation;
-    }
-    get rotation() {
-        return this._rotation;
-    }
-    set rotation(value) {
-        this._rotation = value;
-        this.calculateModel();
-    }
-    get obliquity() {
-        return this._obliquity;
-    }
-    set obliquity(value: number) {
-        this._obliquity = value;
-        this.calculateModel();
     }
     get pos() {
         return this._pos;
     }
     set pos(value) {
         vec3.copy(this._pos, value);
-        this.calculateModel();
-    }
-    calculateModel() {
-        mat4.fromTranslation(this.model, this._pos);
-        mat4.scale(this.model, this.model, vec3.fromValues(this.R, this.R, this.R));
-        mat4.rotateX(this.model, this.model, this.obliquity);
-        mat4.rotateZ(this.model, this.model, this.rotation);
+        mat4.fromTranslation(this.model, value);
+        mat4.scale(this.model, this.model, vec3.fromValues(this.R, this.R, this.R))
         mat4.transpose(this.modelNormal, this.model);
         mat4.invert(this.modelNormal, this.modelNormal);
     }
-    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4): void;
-    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
-    draw(gl: WebGL2RenderingContext, camera: mat4, projection: mat4, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
+    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, color: vec3): void;
+    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, color: vec3, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
+    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, color: vec3, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
         gl.bindVertexArray(VAO);
         if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined) {
             gl.useProgram(programInfo.program);
 
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, this.texture);
-            gl.uniform1i(programInfo.uniformLocations.sampler, 0);
             gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, this.model);
-            gl.uniformMatrix4fv(programInfo.uniformLocations.camera, false, camera);
+            gl.uniformMatrix4fv(programInfo.uniformLocations.view, false, view);
             gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projection);
-            gl.uniformMatrix4fv(programInfo.uniformLocations.modelNormal, false, this.modelNormal);
             gl.uniform3fv(programInfo.uniformLocations.lightSource, lightSource);
             gl.uniform3fv(programInfo.uniformLocations.viewPos, viewPos);
             gl.uniform1f(programInfo.uniformLocations.ambient, ambient);
+            gl.uniform3fv(programInfo.uniformLocations.color, color);
 
             gl.uniform3fv(programInfo.uniformLocations.material.ambient, material.ambient);
             gl.uniform3fv(programInfo.uniformLocations.material.diffuse, material.diffuse);
@@ -287,12 +247,10 @@ export default class TexturedSphere {
         else {
             gl.useProgram(blackBodyProgramInfo.program);
 
-            gl.activeTexture(gl.TEXTURE0);
-            gl.bindTexture(gl.TEXTURE_2D, this.texture);
-            gl.uniform1i(blackBodyProgramInfo.uniformLocations.sampler, 0);
             gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.model, false, this.model);
-            gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.camera, false, camera);
+            gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.view, false, view);
             gl.uniformMatrix4fv(blackBodyProgramInfo.uniformLocations.projection, false, projection);
+            gl.uniform3fv(blackBodyProgramInfo.uniformLocations.color, color);
         }
 
         gl.drawElements(gl.TRIANGLES, elementsLength, gl.UNSIGNED_SHORT, 0);

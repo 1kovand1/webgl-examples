@@ -1,7 +1,7 @@
 export { };
 import { mat4, vec3 } from "gl-matrix";
 import { cameraCords, getWorldToCameraMatrix, processInput } from "./utils/camera"
-import Sphere from "./utils/sphere";
+import Sphere from "./utils/models/sphere";
 import "./assets/controls.css"
 document.title = "Модель Фонга";
 

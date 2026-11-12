@@ -30,3 +30,7 @@ p {
   margin: 0;
   margin-left: 0.5em;
 }
+
+input {
+  flex-grow: 1;
+}
