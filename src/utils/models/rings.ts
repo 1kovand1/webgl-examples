@@ -123,6 +123,10 @@ const fsSource = `#version 300 es
 
     void main()
     {
+        vec3 normal = normalize(Normal);
+        if (gl_FrontFacing)
+            normal = -normal;
+
         vec3 lightDir = normalize(lightSource - FragPos.xyz);
         vec4 color4 = texture(sampler, uv);
         if (color4.a == 0.)
@@ -130,13 +134,13 @@ const fsSource = `#version 300 es
         vec3 color = color4.rgb;
         vec3 lightColor = vec3(1.0);
         vec3 ambient = lightColor * material.ambient;
-        vec3 normal = normalize(Normal);
+        
         vec3 viewDir = normalize(viewPos - FragPos);
         vec3 reflectDir = reflect(-lightDir, normal);
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
         vec3 specular = lightColor * (spec * material.specular);
 
-        float diff = max(dot(Normal, lightDir), 0.0);
+        float diff = max(dot(normal, lightDir), 0.0);
         vec3 diffuse = diff * lightColor * material.diffuse;
 
         vec3 lightFromSource;
@@ -206,7 +210,7 @@ export default class Ring {
         gl.vertexAttribPointer(2, 2, gl.FLOAT, false, 5 * 4, 3 * 4);
         gl.enableVertexAttribArray(0);
         gl.enableVertexAttribArray(2);
-        gl.vertexAttrib3f(1, 0, 0, -1);
+        gl.vertexAttrib3f(1, 0, 0, 1);
 
         const EBO = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, EBO);

@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat3, mat4, vec3 } from 'gl-matrix';
 import initShaderProgram from '../shaderProgram';
 
 const RESOLUTION = 100;
@@ -59,12 +59,12 @@ const vsSource = `#version 300 es
     uniform mat4 model;
     uniform mat4 view;
     uniform mat4 projection;
-    uniform mat4 modelNormal;
+    uniform mat3 modelNormal;
 
     void main() {
         gl_Position = projection * view * model * vec4(vertexPos, 1.0);
         FragPos = vec3(model * vec4(vertexPos, 1.0));
-        Normal = normalize(mat3(modelNormal) * normal);
+        Normal = normalize(modelNormal * normal);
         uv = i_uv;
     }
 `;
@@ -218,7 +218,7 @@ const fsSource = `#version 300 es
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
         vec3 specular = lightColor * (spec * material.specular);
 
-        float diff = max(dot(Normal, lightDir), 0.0);
+        float diff = max(dot(normal, lightDir), 0.0);
         vec3 diffuse = diff * lightColor * material.diffuse;
 
         vec3 lightFromSource;
@@ -355,7 +355,7 @@ interface Material {
 export default class TexturedSphere {
     private readonly R: number;
     private model: mat4 = mat4.create();
-    private modelNormal: mat4 = mat4.create();
+    private modelNormal: mat3 = mat3.create();
     private _pos: vec3 = vec3.create();
     private texture: WebGLTexture;
     private _obliquity: number = 0;
@@ -396,8 +396,9 @@ export default class TexturedSphere {
         mat4.scale(this.model, this.model, vec3.fromValues(this.R, this.R, this.R));
         mat4.rotateX(this.model, this.model, this.obliquity);
         mat4.rotateZ(this.model, this.model, this.rotation);
-        mat4.transpose(this.modelNormal, this.model);
-        mat4.invert(this.modelNormal, this.modelNormal);
+        mat3.fromMat4(this.modelNormal, this.model);
+        mat3.transpose(this.modelNormal, this.modelNormal);
+        mat3.invert(this.modelNormal, this.modelNormal);
     }
     draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4): void;
     draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane: number, bodyPos: vec3, bodyRadius: number, lightSource: vec3, lightSourceRadius: number, viewPos: vec3, ambient: number, material?: Material, ringPos?: vec3, ringNorm?: vec3, ringr?: number, ringR?: number): void;
@@ -413,7 +414,7 @@ export default class TexturedSphere {
             gl.uniformMatrix4fv(programInfo.uniformLocations.model, false, this.model);
             gl.uniformMatrix4fv(programInfo.uniformLocations.view, false, view);
             gl.uniformMatrix4fv(programInfo.uniformLocations.projection, false, projection);
-            gl.uniformMatrix4fv(programInfo.uniformLocations.modelNormal, false, this.modelNormal);
+            gl.uniformMatrix3fv(programInfo.uniformLocations.modelNormal, false, this.modelNormal);
             gl.uniform3fv(programInfo.uniformLocations.lightSource, lightSource);
             gl.uniform3fv(programInfo.uniformLocations.viewPos, viewPos);
             gl.uniform3fv(programInfo.uniformLocations.bodyPos, bodyPos);
