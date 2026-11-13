@@ -59,8 +59,10 @@ const ringTexture = await loadTexture(gl, "./textures/saturn_ring.png");
 
 initRK(modelData);
 
-const spheres: Array<TexturedSphere> = Object.values(modelData).map((d, i) => new TexturedSphere(gl, textures[i], d.radius * 10, d.position, glMatrix.toRadian(d.obliquity ?? 0), 0));
-const ring = new Ring(gl, 0.55, 9.12e-4 * 10, Object.values(modelData)[6].position, ringTexture, glMatrix.toRadian(Object.values(modelData)[6].obliquity ?? 0));
+const radiusMult = 10;
+
+const spheres: Array<TexturedSphere> = Object.values(modelData).map((d, i) => new TexturedSphere(gl, textures[i], d.radius * radiusMult, d.position, glMatrix.toRadian(d.obliquity ?? 0), 0));
+const ring = new Ring(gl, 0.55, 9.12e-4 * radiusMult, Object.values(modelData)[6].position, ringTexture, glMatrix.toRadian(Object.values(modelData)[6].obliquity ?? 0));
 
 await initSkybox(gl);
 
@@ -97,9 +99,12 @@ window.addEventListener("keydown", (e) => {
         }
         else {
             setCameraPos(getPosition(+e.key));
-            moveBackward(Object.values(modelData)[+e.key].radius * 20);
+            moveBackward(Object.values(modelData)[+e.key].radius * 2 * radiusMult);
         }
     }
+    else if (e.code === "Backspace")
+        window.locked = null;
+
 })
 
 window.speed = 1;
@@ -111,23 +116,60 @@ document.querySelectorAll("#overlay *").forEach(x => x.classList.remove("hidden"
 const projectionMatrix = mat4.create();
 
 const lastPos = vec3.create();
+const sunPos = vec3.create();
+const saturnNormal = vec3.fromValues(0,0,1);
+vec3.rotateX(saturnNormal, saturnNormal, [0,0,0], glMatrix.toRadian(modelData.Saturn.obliquity ?? 0));
 
 function draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, near: number) {
+    vec3.copy(sunPos, getPosition(0));
     spheres[0].draw(gl, view, projection);
-    spheres.slice(1).forEach(sphere => {
-        sphere.draw(gl, view, projection, near, getPosition(0), cameraCords, 0, {
+    spheres.slice(1, 3).forEach(sphere => {
+        sphere.draw(gl, view, projection, near, sunPos, 0, sunPos, modelData.Sun.radius * radiusMult, cameraCords, 0.5, {
             shininess: 1,
-            ambient: vec3.fromValues(0, 0, 0),
+            ambient: vec3.fromValues(0.2, 0.2, 0.2),
             diffuse: vec3.fromValues(0.75, 0.75, 0.75),
             specular: vec3.fromValues(0, 0, 0),
         })
-    }
-    );
+    });
+    spheres[3].draw(gl, view, projection, near, getPosition(9), modelData.Moon.radius * radiusMult, sunPos, modelData.Sun.radius * radiusMult, cameraCords, 0.5, {
+            shininess: 1,
+            ambient: vec3.fromValues(0.2, 0.2, 0.2),
+            diffuse: vec3.fromValues(0.75, 0.75, 0.75),
+            specular: vec3.fromValues(0, 0, 0),
+        })
+    spheres[9].draw(gl, view, projection, near, getPosition(3), modelData.Earth.radius * radiusMult, sunPos, modelData.Sun.radius * radiusMult, cameraCords, 0.5, {
+            shininess: 1,
+            ambient: vec3.fromValues(0.2, 0.2, 0.2),
+            diffuse: vec3.fromValues(0.75, 0.75, 0.75),
+            specular: vec3.fromValues(0, 0, 0),
+        })
+    spheres.slice(4, 6).forEach(sphere => {
+        sphere.draw(gl, view, projection, near, sunPos, 0, sunPos, modelData.Sun.radius * radiusMult, cameraCords, 0.5, {
+            shininess: 1,
+            ambient: vec3.fromValues(0.2, 0.2, 0.2),
+            diffuse: vec3.fromValues(0.75, 0.75, 0.75),
+            specular: vec3.fromValues(0, 0, 0),
+        })
+    });
+    spheres[6].draw(gl, view, projection, near, getPosition(6), 0, sunPos, modelData.Sun.radius * radiusMult, cameraCords, 0.5, {
+            shininess: 1,
+            ambient: vec3.fromValues(0.2, 0.2, 0.2),
+            diffuse: vec3.fromValues(0.75, 0.75, 0.75),
+            specular: vec3.fromValues(0, 0, 0),
+        }, getPosition(6), saturnNormal, 0.55*9.12e-4 * radiusMult, 9.12e-4 * radiusMult)
+    spheres.slice(7, 9).forEach(sphere => {
+        sphere.draw(gl, view, projection, near, sunPos, 0, sunPos, modelData.Sun.radius * radiusMult, cameraCords, 0.5, {
+            shininess: 1,
+            ambient: vec3.fromValues(0.2, 0.2, 0.2),
+            diffuse: vec3.fromValues(0.75, 0.75, 0.75),
+            specular: vec3.fromValues(0, 0, 0),
+        })
+    });
     ring.pos = getPosition(6);
     gl.disable(gl.CULL_FACE);
-    ring.draw(gl, view, projection, getPosition(0), cameraCords, 0, {
+    ring.draw(gl, view, projection, sunPos, modelData.Sun.radius * radiusMult, getPosition(6), modelData.Saturn.radius * radiusMult, cameraCords, 0.5, {
         shininess: 1,
-        ambient: vec3.fromValues(0, 0, 0),
+        ambient: vec3.fromValues(0.2, 0.2, 0.2),
         diffuse: vec3.fromValues(0.9, 0.9, 0.9),
         specular: vec3.fromValues(0, 0, 0),
     });
@@ -164,7 +206,7 @@ function render(gl: WebGL2RenderingContext, canvas: HTMLCanvasElement, timestamp
 
     gl.cullFace(gl.BACK);
 
-    mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.001, 50);
+    mat4.perspective(projectionMatrix, Math.PI / 3, canvas.width / canvas.height, 0.00001, Infinity);
     draw(gl, getWorldToCameraMatrix(), projectionMatrix, 0.001);
     FPS.innerText = (1 / dt * 1000).toFixed(0).toString();
 

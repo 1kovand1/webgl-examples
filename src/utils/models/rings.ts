@@ -33,6 +33,9 @@ const fsSource = `#version 300 es
     uniform vec3 viewPos;
     uniform vec3 lightSource;
     uniform sampler2D sampler;
+    uniform vec3 bodyPos;
+    uniform float bodyRadius;
+    uniform float lightSourceRadius;
 
     struct Material {
         vec3 ambient;
@@ -42,27 +45,108 @@ const fsSource = `#version 300 es
     };
     uniform Material material;
 
+    bool segmentIntersectsSphere(
+        vec3 A, vec3 B,
+        vec3 center, float radius
+    ) {
+        vec3 AB = B - A;
+        vec3 AC = center - A;
+
+        float len2 = dot(AB, AB);
+
+        float t = len2 > 0.0
+            ? clamp(dot(AC, AB) / len2, 0.0, 1.0)
+            : 0.0;
+
+        vec3 closest = A + t * AB;
+        vec3 diff = center - closest;
+
+        return dot(diff, diff) <= radius * radius;
+    }
+
+    float calculateVisibility(
+        vec3 fragPos,
+        vec3 fragNormal,
+
+        vec3 lightCenter,
+        float lightRadius,
+
+        vec3 sphereCenter,
+        float sphereRadius
+    ) {
+        const int SAMPLES = 64;
+
+        const float GOLDEN_ANGLE = 2.39996323;
+
+        float visible = 0.0;
+        float total = 0.0;
+
+        vec3 origin = fragPos + fragNormal * 0.001;
+
+        float rotation = fract(
+            sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))
+            * 43758.5453
+        ) * 6.2831853;
+
+        for (int i = 0; i < SAMPLES; ++i) {
+            float z = 1.0 - 2.0 * (float(i) + 0.5) / float(SAMPLES);
+
+            float phi = float(i) * GOLDEN_ANGLE + rotation;
+
+            float r = sqrt(1.0 - z * z);
+
+            vec3 n = vec3(
+                r * cos(phi),
+                r * sin(phi),
+                z
+            );
+
+            vec3 samplePos = lightCenter + n * lightRadius;
+
+            if (dot(n, fragPos - samplePos) <= 0.0)
+                continue;
+
+            total += 1.0;
+
+            if (!segmentIntersectsSphere(
+                origin,
+                samplePos,
+                sphereCenter,
+                sphereRadius
+            )) {
+                visible += 1.0;
+            }
+        }
+
+        return total > 0.0 ? visible / total : 1.0;
+    }
+
     void main()
     {
-        vec3 lightDir = normalize(lightSource - FragPos);
+        vec3 lightDir = normalize(lightSource - FragPos.xyz);
         vec4 color4 = texture(sampler, uv);
         if (color4.a == 0.)
             discard;
         vec3 color = color4.rgb;
         vec3 lightColor = vec3(1.0);
         vec3 ambient = lightColor * material.ambient;
-        vec3 normal = Normal;
-        if (!gl_FrontFacing)
-            normal = -normal;
+        vec3 normal = normalize(Normal);
         vec3 viewDir = normalize(viewPos - FragPos);
         vec3 reflectDir = reflect(-lightDir, normal);
         float spec = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
         vec3 specular = lightColor * (spec * material.specular);
 
-        float diff = max(dot(normal, lightDir), 0.0);
+        float diff = max(dot(Normal, lightDir), 0.0);
         vec3 diffuse = diff * lightColor * material.diffuse;
 
-        FragColor = vec4((ambient + diffuse + specular) * color, 1.0);
+        vec3 lightFromSource;
+
+        if (bodyRadius != 0.)
+            lightFromSource = mix(vec3(0), diffuse + specular, calculateVisibility(FragPos, normal, lightSource, lightSourceRadius, bodyPos, bodyRadius));
+        else
+            lightFromSource = diffuse + specular;
+
+        FragColor = vec4((ambient + lightFromSource) * color, 1.0);
     }
 `;
 
@@ -138,10 +222,13 @@ export default class Ring {
                 view: gl.getUniformLocation(shaderProgram, "view"),
                 projection: gl.getUniformLocation(shaderProgram, "projection"),
                 lightSource: gl.getUniformLocation(shaderProgram, "lightSource"),
+                lightSourceRadius: gl.getUniformLocation(shaderProgram, "lightSourceRadius"),
                 ambient: gl.getUniformLocation(shaderProgram, "ambient"),
                 modelNormal: gl.getUniformLocation(shaderProgram, "modelNormal"),
                 viewPos: gl.getUniformLocation(shaderProgram, "viewPos"),
                 sampler: gl.getUniformLocation(shaderProgram, "sampler"),
+                bodyPos: gl.getUniformLocation(shaderProgram, "bodyPos"),
+                bodyRadius: gl.getUniformLocation(shaderProgram, "bodyRadius"),
                 material: {
                     ambient: gl.getUniformLocation(shaderProgram, "material.ambient"),
                     diffuse: gl.getUniformLocation(shaderProgram, "material.diffuse"),
@@ -193,10 +280,10 @@ export default class Ring {
         this.calculateModel();
     }
     draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4): void;
-        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
-        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
+        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, lightSource: vec3, lightSourceRadius: number, bodyPos: vec3, bodyRadius: number, viewPos: vec3, ambient: number, material?: Material): void;
+        draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, lightSource?: vec3, lightSourceRadius?: number, bodyPos?: vec3, bodyRadius?: number, viewPos?: vec3, ambient?: number, material?: Material): void {
             gl.bindVertexArray(this.VAO);
-            if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined) {
+            if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined && bodyPos !== undefined  && bodyRadius !== undefined && lightSourceRadius !== undefined) {
                 gl.useProgram(this.programInfo.program);
     
                 gl.activeTexture(gl.TEXTURE0);
@@ -209,6 +296,8 @@ export default class Ring {
                 gl.uniformMatrix3fv(this.programInfo.uniformLocations.modelNormal, false, this.modelNormal);
                 gl.uniform3fv(this.programInfo.uniformLocations.lightSource, lightSource);
                 gl.uniform3fv(this.programInfo.uniformLocations.viewPos, viewPos);
+                gl.uniform3fv(this.programInfo.uniformLocations.bodyPos, bodyPos);
+                gl.uniform1f(this.programInfo.uniformLocations.bodyRadius, bodyRadius);
                 gl.uniform1f(this.programInfo.uniformLocations.ambient, ambient);
     
                 gl.uniform3fv(this.programInfo.uniformLocations.material.ambient, material.ambient);

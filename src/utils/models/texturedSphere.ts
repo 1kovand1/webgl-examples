@@ -17,10 +17,17 @@ let programInfo: {
         view: WebGLUniformLocation | null,
         projection: WebGLUniformLocation | null,
         lightSource: WebGLUniformLocation | null,
+        lightSourceRadius: WebGLUniformLocation | null,
         ambient: WebGLUniformLocation | null,
         modelNormal: WebGLUniformLocation | null,
         viewPos: WebGLUniformLocation | null,
         sampler: WebGLUniformLocation | null,
+        bodyPos: WebGLUniformLocation | null,
+        bodyRadius: WebGLUniformLocation | null,
+        ringPos: WebGLUniformLocation | null,
+        ringNorm: WebGLUniformLocation | null,
+        ringr: WebGLUniformLocation | null,
+        ringR: WebGLUniformLocation | null,
         material: {
             ambient: WebGLUniformLocation | null,
             diffuse: WebGLUniformLocation | null,
@@ -71,8 +78,19 @@ const fsSource = `#version 300 es
     out vec4 FragColor;
     uniform float ambient;
     uniform vec3 viewPos;
+
     uniform vec3 lightSource;
+    uniform float lightSourceRadius;
+
     uniform sampler2D sampler;
+
+    uniform vec3 bodyPos;
+    uniform float bodyRadius;
+
+    uniform vec3 ringPos;
+    uniform vec3 ringNorm;
+    uniform float ringr;
+    uniform float ringR;
 
     struct Material {
         vec3 ambient;
@@ -82,6 +100,108 @@ const fsSource = `#version 300 es
     };
     uniform Material material;
 
+    bool segmentIntersectsSphere(
+        vec3 A, vec3 B,
+        vec3 center, float radius
+    ) {
+        vec3 AB = B - A;
+        vec3 AC = center - A;
+
+        float len2 = dot(AB, AB);
+
+        float t = len2 > 0.0
+            ? clamp(dot(AC, AB) / len2, 0.0, 1.0)
+            : 0.0;
+
+        vec3 closest = A + t * AB;
+        vec3 diff = center - closest;
+
+        return dot(diff, diff) <= radius * radius;
+    }
+
+    bool segmentIntersectsRing(
+        vec3 A,
+        vec3 B,
+        vec3 ringCenter,
+        vec3 ringNormal,
+        float innerRadius,
+        float outerRadius
+    ) {
+        vec3 D = B - A;
+
+        float denom = dot(D, ringNormal);
+
+        if (abs(denom) < 1e-6)
+            return false;
+
+        float t = dot(ringCenter - A, ringNormal) / denom;
+
+        if (t < 0.0 || t > 1.0)
+            return false;
+
+        vec3 P = A + t * D;
+
+        vec3 radial = P - ringCenter;
+        radial -= ringNormal * dot(radial, ringNormal);
+
+        float dist2 = dot(radial, radial);
+
+        return dist2 >= innerRadius * innerRadius &&
+            dist2 <= outerRadius * outerRadius;
+    }
+
+    float calculateVisibility(
+        vec3 fragPos,
+        vec3 fragNormal,
+
+        vec3 lightCenter,
+        float lightRadius,
+
+        vec3 sphereCenter,
+        float sphereRadius
+    ) {
+        const int SAMPLES = 64;
+
+        const float GOLDEN_ANGLE = 2.39996323;
+
+        float visible = 0.0;
+        float total = 0.0;
+
+        vec3 origin = fragPos + fragNormal * 0.001;
+
+        float rotation = fract(
+            sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)))
+            * 43758.5453
+        ) * 6.2831853;
+
+        for (int i = 0; i < SAMPLES; ++i) {
+            float z = 1.0 - 2.0 * (float(i) + 0.5) / float(SAMPLES);
+
+            float phi = float(i) * GOLDEN_ANGLE + rotation;
+
+            float r = sqrt(1.0 - z * z);
+
+            vec3 n = vec3(
+                r * cos(phi),
+                r * sin(phi),
+                z
+            );
+
+            vec3 samplePos = lightCenter + n * lightRadius;
+
+            if (dot(n, fragPos - samplePos) <= 0.0)
+                continue;
+
+            total += 1.0;
+
+            if ((sphereRadius == 0. || !segmentIntersectsSphere(origin, samplePos, sphereCenter, sphereRadius))
+                && (ringR == 0. || !segmentIntersectsRing(origin, samplePos, ringPos, ringNorm, ringr, ringR))) {
+                visible += 1.0;
+            }
+        }
+
+        return total > 0.0 ? visible / total : 1.0;
+    }
 
     void main()
     {
@@ -101,7 +221,14 @@ const fsSource = `#version 300 es
         float diff = max(dot(Normal, lightDir), 0.0);
         vec3 diffuse = diff * lightColor * material.diffuse;
 
-        FragColor = vec4((ambient + diffuse + specular) * color, 1.0);
+        vec3 lightFromSource;
+
+        if (bodyRadius != 0. || ringr != 0.)
+            lightFromSource = mix(vec3(0), diffuse + specular, calculateVisibility(FragPos, normal, lightSource, lightSourceRadius, bodyPos, bodyRadius));
+        else
+            lightFromSource = diffuse + specular;
+
+        FragColor = vec4((ambient + lightFromSource) * color, 1.0);
     }
 `;
 
@@ -177,10 +304,17 @@ function initStatic(gl: WebGL2RenderingContext) {
             view: gl.getUniformLocation(shaderProgram, "view"),
             projection: gl.getUniformLocation(shaderProgram, "projection"),
             lightSource: gl.getUniformLocation(shaderProgram, "lightSource"),
+            lightSourceRadius: gl.getUniformLocation(shaderProgram, "lightSourceRadius"),
             ambient: gl.getUniformLocation(shaderProgram, "ambient"),
             modelNormal: gl.getUniformLocation(shaderProgram, "modelNormal"),
             viewPos: gl.getUniformLocation(shaderProgram, "viewPos"),
             sampler: gl.getUniformLocation(shaderProgram, "sampler"),
+            bodyPos: gl.getUniformLocation(shaderProgram, "bodyPos"),
+            bodyRadius: gl.getUniformLocation(shaderProgram, "bodyRadius"),
+            ringPos: gl.getUniformLocation(shaderProgram, "ringPos"),
+            ringNorm: gl.getUniformLocation(shaderProgram, "ringNorm"),
+            ringr: gl.getUniformLocation(shaderProgram, "ringr"),
+            ringR: gl.getUniformLocation(shaderProgram, "ringR"),
             material: {
                 ambient: gl.getUniformLocation(shaderProgram, "material.ambient"),
                 diffuse: gl.getUniformLocation(shaderProgram, "material.diffuse"),
@@ -266,10 +400,10 @@ export default class TexturedSphere {
         mat4.invert(this.modelNormal, this.modelNormal);
     }
     draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4): void;
-    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane: number, lightSource: vec3, viewPos: vec3, ambient: number, material?: Material): void;
-    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane?: number, lightSource?: vec3, viewPos?: vec3, ambient?: number, material?: Material): void {
+    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane: number, bodyPos: vec3, bodyRadius: number, lightSource: vec3, lightSourceRadius: number, viewPos: vec3, ambient: number, material?: Material, ringPos?: vec3, ringNorm?: vec3, ringr?: number, ringR?: number): void;
+    draw(gl: WebGL2RenderingContext, view: mat4, projection: mat4, nearPlane?: number, bodyPos?: vec3, bodyRadius?: number, lightSource?: vec3, lightSourceRadius?: number, viewPos?: vec3, ambient?: number, material?: Material, ringPos?: vec3, ringNorm?: vec3, ringr?: number, ringR?: number): void {
         gl.bindVertexArray(VAO);
-        if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined && nearPlane !== undefined) {
+        if (lightSource !== undefined && ambient !== undefined && material !== undefined && viewPos !== undefined && nearPlane !== undefined && bodyPos !== undefined && bodyRadius !== undefined && lightSourceRadius !== undefined) {
             gl.useProgram(programInfo.program);
 
             gl.activeTexture(gl.TEXTURE0);
@@ -282,7 +416,20 @@ export default class TexturedSphere {
             gl.uniformMatrix4fv(programInfo.uniformLocations.modelNormal, false, this.modelNormal);
             gl.uniform3fv(programInfo.uniformLocations.lightSource, lightSource);
             gl.uniform3fv(programInfo.uniformLocations.viewPos, viewPos);
+            gl.uniform3fv(programInfo.uniformLocations.bodyPos, bodyPos);
+            gl.uniform1f(programInfo.uniformLocations.bodyRadius, bodyRadius);
+            gl.uniform1f(programInfo.uniformLocations.lightSourceRadius, lightSourceRadius);
             gl.uniform1f(programInfo.uniformLocations.ambient, ambient);
+
+            if (ringPos !== undefined && ringNorm !== undefined && ringr !== undefined && ringR !== undefined) {
+                gl.uniform3fv(programInfo.uniformLocations.ringPos, ringPos);
+                gl.uniform3fv(programInfo.uniformLocations.ringNorm, ringNorm);
+                gl.uniform1f(programInfo.uniformLocations.ringr, ringr);
+                gl.uniform1f(programInfo.uniformLocations.ringR, ringR);
+            }
+            else {
+                gl.uniform1f(programInfo.uniformLocations.ringR, 0);
+            }
 
             gl.uniform3fv(programInfo.uniformLocations.material.ambient, material.ambient);
             gl.uniform3fv(programInfo.uniformLocations.material.diffuse, material.diffuse);

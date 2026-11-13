@@ -54,6 +54,7 @@ canvas.addEventListener('mousemove', (e) => {
     quat.multiply(cameraQuat, deltaRotation, cameraQuat);
     quat.setAxisAngle(deltaRotation, right, -dy * SENSITIVITY);
     quat.multiply(cameraQuat, deltaRotation, cameraQuat);
+    quat.normalize(cameraQuat, cameraQuat);
 
     lastMouseX += e.movementX;
     lastMouseY -= e.movementY;
